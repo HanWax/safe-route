@@ -1345,6 +1345,9 @@ async function buildShelterRoute(orig, dest, directRoute, shelters, radius, cove
           selectedShelters.push(...bestShelters);
           usedIds.clear();
           bestShelters.forEach(s => usedIds.add(s.id));
+          // If no good route found yet, further iterations would pick
+          // the same candidates against the same path — stop early
+          if (!bestRoute) break;
         }
         if (bestPct >= coverageTarget) break;
       }
