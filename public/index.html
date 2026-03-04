@@ -719,6 +719,7 @@ let geoLocations = { origin: null, dest: null };
 
 // State for draggable route
 let draggableRenderer = null;
+let shelterListUpdateTimer = null;
 
 // ═══════════════════════════════════════════════════════
 //  USE MY LOCATION
@@ -1337,6 +1338,13 @@ async function buildShelterRoute(orig, dest, directRoute, shelters, radius, cove
           bestRoute = wpRoute;
           bestPct = coverage.coveredPct;
           bestShelters = [...selectedShelters];
+        } else {
+          // This iteration made things worse — revert to the best known
+          // waypoint set so we don't poison the next iteration
+          selectedShelters.length = 0;
+          selectedShelters.push(...bestShelters);
+          usedIds.clear();
+          bestShelters.forEach(s => usedIds.add(s.id));
         }
         if (bestPct >= coverageTarget) break;
       }
@@ -1522,7 +1530,14 @@ function reanalyseDraggedRoute(draggedRoute, shelters, radius) {
     : `${coveredPct}% coverage (target: ${coverageTarget}%) — keep dragging to improve`;
   setStatus(pctLabel, coveredPct >= coverageTarget ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
 
-  // Update mobile bottom sheet if visible
+  // Debounced shelter list update (async — avoid hammering Distance Matrix on each drag)
+  clearTimeout(shelterListUpdateTimer);
+  shelterListUpdateTimer = setTimeout(async () => {
+    await renderShelterList(shelters, draggedRoute.path, radius);
+    if (isMobile()) populateBottomSheet();
+  }, 800);
+
+  // Update mobile bottom sheet immediately for score/gaps
   if (isMobile()) populateBottomSheet();
 }
 
