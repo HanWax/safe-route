@@ -154,6 +154,49 @@
       margin-top: 8px;
     }
     .radius-row label { font-size: 11px; color: var(--muted); flex: 1; }
+
+    /* ── COVERAGE TARGET ── */
+    .target-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px;
+    }
+    .target-row label { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+    .target-row .target-val {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: 13px; min-width: 36px; text-align: right;
+    }
+    .target-slider {
+      flex: 1; -webkit-appearance: none; appearance: none;
+      height: 6px; border-radius: 3px;
+      background: linear-gradient(to right, var(--amber) 0%, var(--green) 100%);
+      outline: none; cursor: pointer;
+    }
+    .target-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--ink); border: 2px solid var(--white);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+    .target-slider::-moz-range-thumb {
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--ink); border: 2px solid var(--white);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+    .target-hint {
+      font-size: 9px; color: var(--muted); margin-top: 3px;
+      line-height: 1.4;
+    }
+
+    /* ── DRAG HINT ── */
+    .drag-hint {
+      font-size: 9.5px; color: var(--blue); margin-top: 8px;
+      padding: 6px 8px; background: var(--blue-dim);
+      border-radius: 2px; line-height: 1.5;
+      display: none;
+    }
+    .drag-hint.show { display: block; }
     select {
       font-family: 'DM Mono', monospace; font-size: 12px;
       border: 1.5px solid var(--border); background: var(--white);
@@ -516,6 +559,13 @@
         </select>
       </div>
 
+      <div class="target-row">
+        <label>Coverage target</label>
+        <input type="range" class="target-slider" id="coverageTarget" min="50" max="100" step="5" value="80"/>
+        <span class="target-val" id="coverageTargetVal">80%</span>
+      </div>
+      <div class="target-hint">Higher targets may produce longer, more circuitous routes.</div>
+
       <button class="btn" id="goBtn" onclick="run()">
         <span class="bt">PLAN SAFE ROUTE</span>
         <div class="sp"></div>
@@ -528,7 +578,7 @@
         <div class="score-top">
           <div>
             <div class="score-pct" id="scorePct">—</div>
-            <div class="score-label">Route coverage</div>
+            <div class="score-label" id="scoreLabel">Route coverage</div>
           </div>
           <div style="text-align:right">
             <div style="font-size:10px;color:var(--muted)">Route length</div>
@@ -554,6 +604,11 @@
             <div class="smeta-l">Exposed dist.</div>
           </div>
         </div>
+      </div>
+
+      <!-- DRAG HINT -->
+      <div class="drag-hint" id="dragHint">
+        ✋ Drag the route on the map to adjust it manually. Coverage will update in real time.
       </div>
 
       <!-- GAP WARNINGS -->
@@ -616,6 +671,11 @@
             <div class="sp"></div>
           </button>
         </div>
+        <div class="target-row" style="margin-top:6px">
+          <label style="font-size:10px">Cover</label>
+          <input type="range" class="target-slider" id="mobileCoverageTarget" min="50" max="100" step="5" value="80"/>
+          <span class="target-val" id="mobileCoverageTargetVal" style="font-size:11px">80%</span>
+        </div>
       </div>
     </div>
 
@@ -640,6 +700,9 @@
         <div style="width:22px;height:14px;border-radius:7px;background:var(--safe-fill);border:1.5px solid var(--safe-stroke);flex-shrink:0"></div>
         Shelter radius
       </div>
+      <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:9px;color:var(--muted)">
+        ✋ Drag route to adjust
+      </div>
     </div>
   </div>
 </div>
@@ -653,6 +716,15 @@ let mapsReady = false;
 let mapObjects = [];
 let shelterRatings = {};
 let geoLocations = { origin: null, dest: null };
+
+// State for draggable route re-analysis
+let lastShelters = [];
+let lastRadius = 400;
+let lastCoverageTarget = 80;
+let lastUsedShelters = [];
+let lastOrig = null;
+let lastDest = null;
+let draggableRenderer = null;
 
 // ═══════════════════════════════════════════════════════
 //  USE MY LOCATION
@@ -699,6 +771,30 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById(id).parentElement.querySelector('.loc-btn').classList.remove('active');
     });
   });
+
+  // Coverage target slider sync
+  const ct = document.getElementById('coverageTarget');
+  const ctv = document.getElementById('coverageTargetVal');
+  if (ct && ctv) {
+    ct.addEventListener('input', () => {
+      ctv.textContent = ct.value + '%';
+      // Sync to mobile
+      const mct = document.getElementById('mobileCoverageTarget');
+      const mctv = document.getElementById('mobileCoverageTargetVal');
+      if (mct) mct.value = ct.value;
+      if (mctv) mctv.textContent = ct.value + '%';
+    });
+  }
+  const mct = document.getElementById('mobileCoverageTarget');
+  const mctv = document.getElementById('mobileCoverageTargetVal');
+  if (mct && mctv) {
+    mct.addEventListener('input', () => {
+      mctv.textContent = mct.value + '%';
+      // Sync to desktop
+      if (ct) ct.value = mct.value;
+      if (ctv) ctv.textContent = mct.value + '%';
+    });
+  }
 });
 
 // ═══════════════════════════════════════════════════════
@@ -811,18 +907,27 @@ function syncInputs() {
   const mo = document.getElementById('mobileOrigin');
   const md = document.getElementById('mobileDest');
   const mr = document.getElementById('mobileRadius');
+  const mct = document.getElementById('mobileCoverageTarget');
   if (mo) document.getElementById('origin').value = mo.value;
   if (md) document.getElementById('dest').value = md.value;
   if (mr) document.getElementById('radius').value = mr.value;
+  if (mct) {
+    document.getElementById('coverageTarget').value = mct.value;
+    document.getElementById('coverageTargetVal').textContent = mct.value + '%';
+  }
 }
 
 function syncInputsToMobile() {
   const mo = document.getElementById('mobileOrigin');
   const md = document.getElementById('mobileDest');
   const mr = document.getElementById('mobileRadius');
+  const mct = document.getElementById('mobileCoverageTarget');
+  const mctv = document.getElementById('mobileCoverageTargetVal');
   if (mo) mo.value = document.getElementById('origin').value;
   if (md) md.value = document.getElementById('dest').value;
   if (mr) mr.value = document.getElementById('radius').value;
+  if (mct) mct.value = document.getElementById('coverageTarget').value;
+  if (mctv) mctv.textContent = document.getElementById('coverageTarget').value + '%';
 }
 
 // Mobile status updates
@@ -957,6 +1062,7 @@ async function run() {
   const origText = document.getElementById('origin').value.trim();
   const destText = document.getElementById('dest').value.trim();
   const radius = parseInt(document.getElementById('radius').value);
+  const coverageTarget = parseInt(document.getElementById('coverageTarget').value);
 
   if (!origText || !destText) {
     setStatus('Enter both a start and end point.', 'err');
@@ -1000,11 +1106,11 @@ async function run() {
     setStatus('Fetching מקלטים from Tel Aviv Municipality…', 'info');
     const bbox = getPathBbox(directRoute.path, 0.012);
     const shelters = await fetchTLVShelters(bbox);
-    setStatus(`Found ${shelters.length} miklatim. Analysing coverage…`, 'info');
+    setStatus(`Found ${shelters.length} miklatim. Optimising for ${coverageTarget}% coverage…`, 'info');
 
-    // 3. Build shelter-aware route
-    const { waypointRoute, usedShelters } = await buildShelterRoute(
-      orig, dest, directRoute, shelters, radius
+    // 3. Build shelter-aware route with coverage target
+    const { waypointRoute, usedShelters, achievedPct } = await buildShelterRoute(
+      orig, dest, directRoute, shelters, radius, coverageTarget
     );
     const finalRoute = waypointRoute || directRoute;
 
@@ -1019,8 +1125,19 @@ async function run() {
     drawEndpoints(finalRoute);
     fitAll(finalRoute, shelters);
 
-    // 6. UI
-    renderScore(coveredPct, gaps, finalRoute, shelters.length);
+    // 6. Store state for drag-to-edit re-analysis
+    lastShelters = shelters;
+    lastRadius = radius;
+    lastCoverageTarget = coverageTarget;
+    lastUsedShelters = usedShelters;
+    lastOrig = orig;
+    lastDest = dest;
+
+    // 7. Set up draggable route
+    setupDraggableRoute(finalRoute, shelters, radius);
+
+    // 8. UI
+    renderScore(coveredPct, gaps, finalRoute, shelters.length, coverageTarget);
     setStatus('Calculating walking distances…', 'info');
     const nearby = await renderShelterList(shelters, finalRoute.path, radius);
     renderGaps(gaps);
@@ -1028,10 +1145,14 @@ async function run() {
 
     document.getElementById('legend').classList.add('show');
     document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('dragHint').classList.add('show');
 
-    const pctLabel = coveredPct >= 99 ? '✓ Fully covered route' :
-                     `${coveredPct}% of route within shelter radius`;
-    setStatus(pctLabel, coveredPct >= 99 ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
+    const pctLabel = coveredPct >= coverageTarget
+      ? `✓ ${coveredPct}% coverage meets your ${coverageTarget}% target`
+      : coveredPct >= 99
+        ? '✓ Fully covered route'
+        : `${coveredPct}% coverage (target: ${coverageTarget}%) — drag the route to improve`;
+    setStatus(pctLabel, coveredPct >= coverageTarget ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
 
     // On mobile, populate the bottom sheet and show it in peek mode
     if (isMobile()) {
@@ -1160,20 +1281,115 @@ async function fetchTLVShelters(bbox) {
 // ═══════════════════════════════════════════════════════
 //  STEP 3: BUILD SHELTER-AWARE ROUTE
 // ═══════════════════════════════════════════════════════
-async function buildShelterRoute(orig, dest, directRoute, shelters, radius) {
-  if (!shelters.length) return { waypointRoute: null, usedShelters: [] };
+async function buildShelterRoute(orig, dest, directRoute, shelters, radius, coverageTarget = 80) {
+  if (!shelters.length) return { waypointRoute: null, usedShelters: [], achievedPct: 0 };
 
+  // Check if direct route already meets target
+  const directCoverage = analyseRouteCoverage(directRoute.path, shelters, radius);
+  if (directCoverage.coveredPct >= coverageTarget) {
+    return { waypointRoute: directRoute, usedShelters: [], achievedPct: directCoverage.coveredPct };
+  }
+
+  // Collect all gap points and their nearest shelters
   const gapPoints = directRoute.path.filter(p =>
     !isPointCovered(p, shelters, radius)
   );
 
   if (!gapPoints.length) {
-    return { waypointRoute: directRoute, usedShelters: [] };
+    return { waypointRoute: directRoute, usedShelters: [], achievedPct: 100 };
   }
 
+  // Score each shelter by how many gap points it would cover
+  const effectiveRadius = radius / WALK_FACTOR;
+  const shelterGapCoverage = shelters.map(s => {
+    let coverCount = 0;
+    for (const pt of gapPoints) {
+      if (google.maps.geometry.spherical.computeDistanceBetween(pt, s.location) <= effectiveRadius * 2) {
+        coverCount++;
+      }
+    }
+    return { shelter: s, coverCount };
+  }).filter(x => x.coverCount > 0).sort((a, b) => b.coverCount - a.coverCount);
+
+  // Iteratively add waypoints, re-checking coverage after each batch
+  let bestRoute = null;
+  let bestPct = directCoverage.coveredPct;
+  let bestShelters = [];
+  const usedIds = new Set();
+  const selectedShelters = [];
+  const MAX_WAYPOINTS = 23; // Google Directions limit: 25 total - 2 for origin/dest
+  const MAX_ITERATIONS = 3; // Limit API calls
+
+  for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    // Pick shelters to add this iteration
+    const currentPath = bestRoute ? bestRoute.path : directRoute.path;
+    const currentGapPoints = currentPath.filter(p => !isPointCovered(p, shelters, radius));
+
+    if (!currentGapPoints.length || bestPct >= coverageTarget) break;
+    if (selectedShelters.length >= MAX_WAYPOINTS) break;
+
+    // Re-score remaining shelters against current gaps
+    const candidates = shelters
+      .filter(s => !usedIds.has(s.id))
+      .map(s => {
+        let coverCount = 0;
+        for (const pt of currentGapPoints) {
+          if (google.maps.geometry.spherical.computeDistanceBetween(pt, s.location) <= effectiveRadius * 2) {
+            coverCount++;
+          }
+        }
+        // Also consider distance from route — prefer closer shelters
+        const routeDist = minDistToPath(s.location, currentPath);
+        return { shelter: s, coverCount, routeDist };
+      })
+      .filter(x => x.coverCount > 0 && x.routeDist < radius * 4 / WALK_FACTOR)
+      .sort((a, b) => b.coverCount - a.coverCount || a.routeDist - b.routeDist);
+
+    // Add top candidates (batch of up to 8 per iteration)
+    const batchSize = Math.min(8, MAX_WAYPOINTS - selectedShelters.length);
+    let added = 0;
+    for (const c of candidates) {
+      if (added >= batchSize) break;
+      if (!usedIds.has(c.shelter.id)) {
+        usedIds.add(c.shelter.id);
+        selectedShelters.push(c.shelter);
+        added++;
+      }
+    }
+
+    if (!added) break;
+
+    setStatus(`Iteration ${iteration + 1}: routing through ${selectedShelters.length} shelter waypoints…`, 'info');
+
+    try {
+      const waypoints = selectedShelters.map(s => new google.maps.LatLng(s.lat, s.lon));
+      const wpRoute = await getRoute(orig, dest, waypoints);
+      if (wpRoute) {
+        const coverage = analyseRouteCoverage(wpRoute.path, shelters, radius);
+        if (coverage.coveredPct > bestPct) {
+          bestRoute = wpRoute;
+          bestPct = coverage.coveredPct;
+          bestShelters = [...selectedShelters];
+        }
+        if (bestPct >= coverageTarget) break;
+      }
+    } catch (e) {
+      console.warn(`Waypoint route iteration ${iteration + 1} failed`, e);
+      break;
+    }
+  }
+
+  // If we still haven't met the target, return the best we found
+  if (bestRoute) {
+    if (bestPct < coverageTarget) {
+      setStatus(`Best achievable: ${bestPct}% (target: ${coverageTarget}%). Drag the route to improve.`, 'info');
+    }
+    return { waypointRoute: bestRoute, usedShelters: bestShelters, achievedPct: bestPct };
+  }
+
+  // Fallback: single-pass nearest-shelter approach
   const waypointShelterSet = new Set();
   const waypointShelters = [];
-
   for (const pt of gapPoints) {
     let nearest = null, nearestD = Infinity;
     for (const s of shelters) {
@@ -1184,22 +1400,19 @@ async function buildShelterRoute(orig, dest, directRoute, shelters, radius) {
       waypointShelterSet.add(nearest.id);
       waypointShelters.push(nearest);
     }
-    if (waypointShelters.length >= 23) break;
+    if (waypointShelters.length >= MAX_WAYPOINTS) break;
   }
 
-  if (!waypointShelters.length) return { waypointRoute: null, usedShelters: [] };
-
-  setStatus(`Routing through ${waypointShelters.length} shelter waypoints…`, 'info');
+  if (!waypointShelters.length) return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
 
   try {
-    const waypoints = waypointShelters.map(s =>
-      new google.maps.LatLng(s.lat, s.lon)
-    );
+    const waypoints = waypointShelters.map(s => new google.maps.LatLng(s.lat, s.lon));
     const wpRoute = await getRoute(orig, dest, waypoints);
-    return { waypointRoute: wpRoute, usedShelters: waypointShelters };
-  } catch(e) {
+    const pct = wpRoute ? analyseRouteCoverage(wpRoute.path, shelters, radius).coveredPct : 0;
+    return { waypointRoute: wpRoute, usedShelters: waypointShelters, achievedPct: pct };
+  } catch (e) {
     console.warn('Waypoint route failed, falling back', e);
-    return { waypointRoute: directRoute, usedShelters: [] };
+    return { waypointRoute: directRoute, usedShelters: [], achievedPct: directCoverage.coveredPct };
   }
 }
 
@@ -1255,6 +1468,97 @@ function isPointCovered(point, shelters, radius) {
       return true;
   }
   return false;
+}
+
+// ═══════════════════════════════════════════════════════
+//  DRAGGABLE ROUTE
+// ═══════════════════════════════════════════════════════
+function setupDraggableRoute(route, shelters, radius) {
+  // Remove previous draggable renderer
+  if (draggableRenderer) {
+    draggableRenderer.setMap(null);
+    draggableRenderer = null;
+  }
+
+  // Create a new draggable DirectionsRenderer on top of the drawn route
+  draggableRenderer = new google.maps.DirectionsRenderer({
+    map,
+    directions: route.result,
+    draggable: true,
+    suppressMarkers: true,
+    preserveViewport: true,
+    polylineOptions: {
+      strokeOpacity: 0,  // invisible — user sees our coloured polylines
+      strokeWeight: 12,  // wide hit target for dragging
+      zIndex: 10,
+    },
+  });
+  mapObjects.push(draggableRenderer);
+
+  // Listen for route drag changes
+  google.maps.event.addListener(draggableRenderer, 'directions_changed', () => {
+    const newDirections = draggableRenderer.getDirections();
+    if (!newDirections || !newDirections.routes || !newDirections.routes[0]) return;
+
+    // Extract the new path from the dragged route
+    let allPoints = [];
+    for (const leg of newDirections.routes[0].legs) {
+      for (const step of leg.steps) {
+        const pts = google.maps.geometry.encoding.decodePath(step.polyline.points);
+        allPoints = allPoints.concat(pts);
+      }
+    }
+
+    const totalDistance = newDirections.routes[0].legs.reduce((s, l) => s + l.distance.value, 0);
+    const totalDuration = newDirections.routes[0].legs.reduce((s, l) => s + l.duration.value, 0);
+
+    const draggedRoute = {
+      result: newDirections,
+      path: allPoints,
+      totalDistance,
+      totalDuration,
+      startLocation: newDirections.routes[0].legs[0].start_location,
+      endLocation: newDirections.routes[0].legs[newDirections.routes[0].legs.length - 1].end_location,
+    };
+
+    // Re-analyse coverage with the dragged route
+    reanalyseDraggedRoute(draggedRoute, shelters, radius);
+  });
+}
+
+function reanalyseDraggedRoute(draggedRoute, shelters, radius) {
+  // Remove old drawn polylines (but not circles, markers, renderer)
+  const toRemove = [];
+  const toKeep = [];
+  for (const obj of mapObjects) {
+    if (obj instanceof google.maps.Polyline && obj !== draggableRenderer) {
+      obj.setMap(null);
+      toRemove.push(obj);
+    } else {
+      toKeep.push(obj);
+    }
+  }
+  mapObjects = toKeep;
+
+  // Re-run coverage analysis
+  const { coveredPct, gaps, coveredPolyline, gapPolylines } =
+    analyseRouteCoverage(draggedRoute.path, shelters, radius);
+
+  // Redraw coloured route
+  drawRoute(coveredPolyline, gapPolylines);
+
+  // Update UI
+  const coverageTarget = parseInt(document.getElementById('coverageTarget').value);
+  renderScore(coveredPct, gaps, draggedRoute, shelters.length, coverageTarget);
+  renderGaps(gaps);
+
+  const pctLabel = coveredPct >= coverageTarget
+    ? `✓ ${coveredPct}% coverage meets your ${coverageTarget}% target`
+    : `${coveredPct}% coverage (target: ${coverageTarget}%) — keep dragging to improve`;
+  setStatus(pctLabel, coveredPct >= coverageTarget ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
+
+  // Update mobile bottom sheet if visible
+  if (isMobile()) populateBottomSheet();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1421,17 +1725,27 @@ function fitAll(route, shelters) {
 // ═══════════════════════════════════════════════════════
 //  UI RENDERING
 // ═══════════════════════════════════════════════════════
-function renderScore(pct, gaps, route, shelterCount) {
+function renderScore(pct, gaps, route, shelterCount, coverageTarget = 80) {
   const wrap = document.getElementById('scoreWrap');
   wrap.classList.add('show');
 
   const el = document.getElementById('scorePct');
   el.textContent = `${pct}%`;
-  el.className = 'score-pct ' + (pct >= 99 ? 'full' : pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low');
+  // Colour based on whether the target is met
+  const meetsTarget = pct >= coverageTarget;
+  el.className = 'score-pct ' + (meetsTarget ? (pct >= 99 ? 'full' : 'high') : pct >= 50 ? 'mid' : 'low');
 
   const bar = document.getElementById('scoreBar');
   bar.style.width = `${pct}%`;
-  bar.style.background = pct >= 99 ? '#18C96A' : pct >= 80 ? '#8BC34A' : pct >= 50 ? '#E8920F' : '#D93B22';
+  bar.style.background = meetsTarget ? (pct >= 99 ? '#18C96A' : '#8BC34A') : pct >= 50 ? '#E8920F' : '#D93B22';
+
+  // Update coverage label with target info
+  const scoreLabel = document.getElementById('scoreLabel');
+  if (scoreLabel) {
+    scoreLabel.textContent = meetsTarget
+      ? `Coverage (target: ${coverageTarget}% ✓)`
+      : `Coverage (target: ${coverageTarget}%)`;
+  }
 
   const totalSec = route.totalDuration || 0;
   const h = Math.floor(totalSec / 3600);
@@ -1631,6 +1945,10 @@ function clearAll() {
   mapObjects = [];
   shelterRatings = {};
   if (dirRenderer) dirRenderer.setDirections({ routes: [] });
+  if (draggableRenderer) {
+    draggableRenderer.setMap(null);
+    draggableRenderer = null;
+  }
 
   document.getElementById('scoreWrap').classList.remove('show');
   document.getElementById('shelterSection').style.display = 'none';
@@ -1639,6 +1957,7 @@ function clearAll() {
   document.getElementById('gapList').innerHTML = '';
   document.getElementById('legend').classList.remove('show');
   document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('dragHint').classList.remove('show');
 
   // Clear mobile bottom sheet
   const bsContent = document.getElementById('bottomSheetContent');
