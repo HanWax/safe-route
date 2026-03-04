@@ -324,6 +324,19 @@
       letter-spacing: 0.05em;
     }
     .data-src a { color: var(--blue); text-decoration: none; }
+
+    /* ── RATINGS ── */
+    .s-rating { display: flex; align-items: center; gap: 6px; margin-top: 5px; padding-left: 28px; font-size: 10px; color: var(--muted); }
+    .s-stars { color: var(--amber); letter-spacing: 1px; }
+    .star-input span { cursor: pointer; font-size: 18px; color: var(--border); transition: color 0.1s; }
+    .star-input span.active { color: var(--amber); }
+    .star-input span:hover, .star-input span:hover ~ span { color: var(--amber); }
+    .review-form textarea { width: 100%; font-family: 'DM Mono', monospace; font-size: 11px; border: 1px solid var(--border); padding: 6px; margin-top: 6px; resize: vertical; min-height: 40px; border-radius: 2px; }
+    .review-form button { margin-top: 4px; padding: 4px 10px; font-size: 10px; font-family: 'Syne', sans-serif; font-weight: 700; background: var(--ink); color: var(--paper); border: none; cursor: pointer; border-radius: 2px; }
+    .review-form button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .iw-reviews { margin-top: 6px; padding-top: 6px; border-top: 1px solid #eee; }
+    .iw-review { font-size: 10px; color: #666; margin-bottom: 4px; line-height: 1.4; }
+    .iw-review .iw-r-stars { color: var(--amber); font-size: 9px; }
   </style>
 </head>
 <body>
@@ -453,6 +466,7 @@
 let map, dirSvc, dirRenderer;
 let mapsReady = false;
 let mapObjects = [];
+let shelterRatings = {};
 
 // Tel Aviv Municipality ArcGIS endpoint for shelter layer 592
 const TLV_GIS_BASE = 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/WM/IView2WM/MapServer/592/query';
@@ -568,8 +582,9 @@ async function run() {
     // 6. UI
     renderScore(coveredPct, gaps, finalRoute, shelters.length);
     setStatus('Calculating walking distances…', 'info');
-    await renderShelterList(shelters, finalRoute.path, radius);
+    const nearby = await renderShelterList(shelters, finalRoute.path, radius);
     renderGaps(gaps);
+    fetchAndDisplayRatings((nearby || []).map(s => s.id));
 
     document.getElementById('legend').classList.add('show');
     document.getElementById('emptyState').style.display = 'none';
@@ -875,6 +890,16 @@ function drawShelterMarkers(shelters, usedShelters) {
         ${areaStr}${filtStr}
         <br>${statusBadge} ${accessBadge}
         ${notesStr}
+        <div class="iw-rating-line" data-shelter="${s.id}" style="margin-top:6px;font-size:11px"></div>
+        <div class="iw-reviews" data-shelter="${s.id}"></div>
+        <div class="review-form" style="margin-top:8px;padding-top:6px;border-top:1px solid #eee">
+          <div style="font-size:10px;color:#888;margin-bottom:2px">Rate this shelter</div>
+          <div class="star-input" data-shelter="${s.id}" style="direction:ltr">
+            <span data-v="1">☆</span><span data-v="2">☆</span><span data-v="3">☆</span><span data-v="4">☆</span><span data-v="5">☆</span>
+          </div>
+          <textarea placeholder="Optional review (max 500 chars)" maxlength="500"></textarea>
+          <button onclick="submitReview('${s.id}', this)">Submit</button>
+        </div>
         <div style="margin-top:4px;color:#aaa;font-size:9px">עיריית תל אביב-יפו</div>
       </div>`
     });
@@ -882,6 +907,34 @@ function drawShelterMarkers(shelters, usedShelters) {
       closeAllIW();
       iw.open(map, marker);
       highlightCard(i);
+    });
+    google.maps.event.addListener(iw, 'domready', () => {
+      // Populate rating from cache
+      const r = shelterRatings[s.id];
+      const rLine = document.querySelector(`.iw-rating-line[data-shelter="${s.id}"]`);
+      if (rLine && r) {
+        rLine.innerHTML = `<span style="color:var(--amber)">${renderStars(r.avg)}</span> ${r.avg} <span style="color:#888">(${r.count})</span>`;
+      }
+      // Populate recent reviews
+      const rDiv = document.querySelector(`.iw-reviews[data-shelter="${s.id}"]`);
+      if (rDiv && r && r.reviews.length) {
+        rDiv.innerHTML = r.reviews.slice(0, 3).map(rv =>
+          `<div class="iw-review"><span class="iw-r-stars">${renderStars(rv.rating)}</span> ${rv.text ? rv.text : ''}</div>`
+        ).join('');
+      }
+      // Wire star picker
+      const starInput = document.querySelector(`.star-input[data-shelter="${s.id}"]`);
+      if (starInput) {
+        starInput.querySelectorAll('span').forEach(sp => {
+          sp.addEventListener('click', () => {
+            const v = parseInt(sp.dataset.v);
+            starInput.querySelectorAll('span').forEach((x, xi) => {
+              x.textContent = xi < v ? '★' : '☆';
+              x.classList.toggle('active', xi < v);
+            });
+          });
+        });
+      }
     });
     mapObjects.push(marker);
     mapObjects.push(iw);
@@ -1038,6 +1091,7 @@ async function renderShelterList(shelters, path, radius) {
       </div>
       ${s.addr && s.addrEng ? `<div class="s-addr">${s.addrEng}</div>` : ''}
       ${tagsHtml}
+      <div class="s-rating" data-shelter="${s.id}"></div>
       ${notesHtml}
     `;
     card.addEventListener('click', () => {
@@ -1048,6 +1102,8 @@ async function renderShelterList(shelters, path, radius) {
     });
     list.appendChild(card);
   });
+
+  return nearby;
 }
 
 function highlightCard(idx) {
@@ -1125,6 +1181,7 @@ function clearAll() {
     else if (o.close) o.close();
   });
   mapObjects = [];
+  shelterRatings = {};
   if (dirRenderer) dirRenderer.setDirections({ routes: [] });
 
   document.getElementById('scoreWrap').classList.remove('show');
@@ -1146,6 +1203,76 @@ function setBusy(b) {
   const btn = document.getElementById('goBtn');
   btn.classList.toggle('loading', b);
   btn.disabled = b;
+}
+
+// ═══════════════════════════════════════════════════════
+//  RATINGS & REVIEWS
+// ═══════════════════════════════════════════════════════
+function renderStars(avg, max = 5) {
+  let s = '';
+  for (let i = 1; i <= max; i++) s += i <= Math.round(avg) ? '★' : '☆';
+  return s;
+}
+
+async function fetchAndDisplayRatings(shelterIds) {
+  if (!shelterIds.length) return;
+  try {
+    const res = await fetch('/api/reviews?shelters=' + shelterIds.join(','));
+    if (!res.ok) return;
+    const data = await res.json();
+    Object.assign(shelterRatings, data);
+    // Update sidebar cards
+    for (const [id, info] of Object.entries(data)) {
+      const el = document.querySelector(`.s-rating[data-shelter="${id}"]`);
+      if (el) {
+        el.innerHTML = `<span class="s-stars">${renderStars(info.avg)}</span> ${info.avg} (${info.count})`;
+      }
+    }
+  } catch(e) { console.warn('ratings fetch failed', e); }
+}
+
+async function submitReview(shelterId, btn) {
+  const form = btn.closest('.review-form');
+  const stars = form.querySelectorAll('.star-input span.active');
+  const rating = stars.length;
+  if (!rating) return;
+  const textarea = form.querySelector('textarea');
+  const text = (textarea?.value || '').trim();
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const res = await fetch('/api/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shelter_id: shelterId, rating, text }),
+    });
+    if (!res.ok) throw new Error('Failed');
+    // Update local cache
+    if (!shelterRatings[shelterId]) shelterRatings[shelterId] = { avg: 0, count: 0, reviews: [] };
+    const c = shelterRatings[shelterId];
+    c.avg = Math.round(((c.avg * c.count) + rating) / (c.count + 1) * 10) / 10;
+    c.count++;
+    c.reviews.unshift({ rating, text, date: new Date().toISOString() });
+    // Update sidebar card
+    const el = document.querySelector(`.s-rating[data-shelter="${shelterId}"]`);
+    if (el) el.innerHTML = `<span class="s-stars">${renderStars(c.avg)}</span> ${c.avg} (${c.count})`;
+    // Update info window display
+    btn.textContent = 'Thanks!';
+    if (textarea) textarea.value = '';
+    form.querySelectorAll('.star-input span').forEach(s => s.classList.remove('active'));
+  } catch(e) {
+    btn.textContent = 'Error — retry';
+    btn.disabled = false;
+  }
+}
+
+function minDistToPath(point, path) {
+  let min = Infinity;
+  for (const p of path) {
+    const d = google.maps.geometry.spherical.computeDistanceBetween(point, p);
+    if (d < min) min = d;
+  }
+  return min;
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
