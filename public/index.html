@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>מקלט | Safe Route Planner</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@700;800;900&family=Noto+Sans+Hebrew:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:        #0f0f0f;
+      --paper:      #F4EFE6;
+      --paper2:     #EBE5D8;
+      --white:      #ffffff;
+      --red:        #D93B22;
+      --red-dim:    rgba(217,59,34,0.12);
+      --blue:       #1A4DE8;
+      --blue-dim:   rgba(26,77,232,0.10);
+      --green:      #18C96A;
+      --amber:      #E8920F;
+      --muted:      #888;
+      --border:     #D0C9BC;
+      --safe-fill:  rgba(24,201,106,0.10);
+      --safe-stroke:rgba(24,201,106,0.55);
+      --gap-stroke: rgba(217,59,34,0.85);
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      font-family: 'DM Mono', monospace;
+      background: var(--paper);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--ink);
+      color: var(--paper);
+      height: 52px;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 900;
+      font-size: 18px;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo-shield {
+      width: 26px; height: 26px;
+      background: var(--red);
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; flex-shrink: 0;
+    }
+    .logo-he {
+      font-family: 'Noto Sans Hebrew', sans-serif;
+      font-size: 13px; opacity: 0.4; font-weight: 400;
+    }
+    .header-tag {
+      margin-left: auto;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.35;
+    }
+
+    /* ── LAYOUT ── */
+    .app { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 320px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1.5px solid var(--ink);
+      background: var(--paper);
+      overflow: hidden;
+    }
+    .sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 16px;
+    }
+    .sidebar-scroll::-webkit-scrollbar { width: 3px; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border); }
+
+    .lbl {
+      font-size: 9.5px;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 7px;
+      margin-top: 18px;
+    }
+    .lbl:first-child { margin-top: 0; }
+
+    .field {
+      position: relative;
+      margin-bottom: 8px;
+    }
+    .field-dot {
+      position: absolute; left: 10px; top: 50%;
+      transform: translateY(-50%);
+      width: 9px; height: 9px; border-radius: 50%;
+      pointer-events: none; z-index: 2;
+    }
+    .field-dot.s { background: var(--green); border: 1.5px solid var(--ink); }
+    .field-dot.e { background: var(--red);   border: 1.5px solid var(--ink); }
+
+    input[type=text], input[type=password] {
+      width: 100%;
+      padding: 10px 10px 10px 28px;
+      border: 1.5px solid var(--border);
+      background: var(--white);
+      font-family: 'DM Mono', monospace;
+      font-size: 12.5px;
+      color: var(--ink);
+      outline: none;
+      transition: border-color 0.15s;
+      border-radius: 2px;
+    }
+    input[type=text].plain, input[type=password].plain { padding-left: 10px; }
+    input:focus { border-color: var(--blue); }
+    input::placeholder { color: var(--muted); }
+
+    .radius-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 8px;
+    }
+    .radius-row label { font-size: 11px; color: var(--muted); flex: 1; }
+    select {
+      font-family: 'DM Mono', monospace; font-size: 12px;
+      border: 1.5px solid var(--border); background: var(--white);
+      padding: 5px 8px; outline: none; cursor: pointer; border-radius: 2px;
+      color: var(--ink);
+    }
+
+    .btn {
+      width: 100%; padding: 11px;
+      background: var(--ink); color: var(--paper);
+      border: none; font-family: 'Syne', sans-serif;
+      font-weight: 800; font-size: 13px;
+      letter-spacing: 0.06em; cursor: pointer;
+      transition: opacity 0.15s; margin-top: 14px;
+      border-radius: 2px; position: relative;
+    }
+    .btn:hover { opacity: 0.82; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn .sp {
+      display: none; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 0.65s linear infinite; margin: 0 auto;
+    }
+    .btn.loading .bt { display: none; }
+    .btn.loading .sp { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status {
+      font-size: 11px; min-height: 26px;
+      padding: 6px 0; color: var(--muted);
+      line-height: 1.5;
+    }
+    .status.err  { color: var(--red); }
+    .status.info { color: var(--blue); }
+    .status.ok   { color: var(--green); }
+
+    /* ── SCORE BAR ── */
+    .score-wrap {
+      display: none; margin-top: 4px;
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      padding: 12px 14px;
+      border-radius: 2px;
+    }
+    .score-wrap.show { display: block; }
+    .score-top {
+      display: flex; align-items: baseline;
+      justify-content: space-between; margin-bottom: 8px;
+    }
+    .score-pct {
+      font-family: 'Syne', sans-serif;
+      font-weight: 900; font-size: 28px;
+    }
+    .score-pct.full  { color: var(--green); }
+    .score-pct.high  { color: #8BC34A; }
+    .score-pct.mid   { color: var(--amber); }
+    .score-pct.low   { color: var(--red); }
+    .score-label { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+    .score-bar-track {
+      height: 6px; background: var(--paper2);
+      border-radius: 3px; overflow: hidden;
+    }
+    .score-bar-fill {
+      height: 100%; border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+    .score-meta {
+      display: flex; gap: 16px; margin-top: 10px;
+    }
+    .smeta { display: flex; flex-direction: column; gap: 1px; }
+    .smeta-v {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700; font-size: 14px;
+    }
+    .smeta-l { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* ── SHELTER LIST ── */
+    .section-head {
+      font-size: 9.5px; letter-spacing: 0.13em;
+      text-transform: uppercase; color: var(--muted);
+      margin: 16px 0 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .section-head::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+
+    .s-card {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 2px;
+      padding: 10px 11px;
+      margin-bottom: 7px;
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .s-card:hover { border-color: var(--blue); background: #f0f4ff; }
+    .s-card.active { border-color: var(--blue); background: var(--blue-dim); }
+    .s-card-row { display: flex; align-items: flex-start; gap: 8px; }
+    .s-num {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 10px; background: var(--blue); color: white;
+      width: 20px; height: 20px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .s-name { font-size: 11.5px; font-weight: 500; flex: 1; line-height: 1.4; }
+    .s-dist { font-size: 10.5px; color: var(--blue); font-weight: 500; flex-shrink: 0; }
+    .s-addr { font-size: 10px; color: var(--muted); margin-top: 3px; padding-left: 28px; }
+
+    /* ── GAP WARNINGS ── */
+    .gap-card {
+      background: var(--red-dim);
+      border: 1.5px solid rgba(217,59,34,0.4);
+      border-radius: 2px; padding: 9px 11px;
+      margin-bottom: 6px; font-size: 11px;
+    }
+    .gap-card strong { color: var(--red); font-family: 'Syne', sans-serif; }
+
+    /* ── DISCLAIMER ── */
+    .disc {
+      background: #fff8e1;
+      border: 1.5px solid var(--amber);
+      border-radius: 2px;
+      padding: 9px 11px;
+      font-size: 10px; line-height: 1.6;
+      color: #5a4a00; margin-top: 12px;
+    }
+    .disc strong { color: var(--red); }
+
+    /* ── EMPTY ── */
+    .empty {
+      text-align: center; padding: 28px 12px;
+      color: var(--muted);
+    }
+    .empty-icon { font-size: 36px; margin-bottom: 10px; }
+    .empty-txt { font-size: 11.5px; line-height: 1.7; }
+
+    /* ── LEGEND ── */
+    .legend {
+      position: absolute; bottom: 20px; right: 20px;
+      background: var(--white); border: 1.5px solid var(--ink);
+      padding: 11px 14px; z-index: 5;
+      box-shadow: 3px 3px 0 var(--ink);
+      font-size: 11px; min-width: 170px;
+      display: none;
+    }
+    .legend.show { display: block; }
+    .legend-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: 11px; margin-bottom: 8px;
+      padding-bottom: 6px; border-bottom: 1px solid var(--border);
+    }
+    .leg-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .leg-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+    .leg-line { width: 22px; height: 4px; flex-shrink: 0; border-radius: 2px; }
+
+    /* ── MAP ── */
+    .map-wrap { flex: 1; position: relative; min-width: 0; min-height: 0; }
+    #map { width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-shield">🛡</div>
+    Miklat Route
+    <span class="logo-he">מקלט</span>
+  </div>
+  <div class="header-tag">Shelter-Safe Walking Planner · Israel</div>
+</header>
+
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <div class="sidebar">
+    <div class="sidebar-scroll">
+
+      <div class="lbl">Route</div>
+      <div class="field">
+        <div class="field-dot s"></div>
+        <input type="text" id="origin" placeholder="Start…"/>
+      </div>
+      <div class="field">
+        <div class="field-dot e"></div>
+        <input type="text" id="dest" placeholder="Destination…"/>
+      </div>
+
+      <div class="radius-row">
+        <label>Max gap from miklat</label>
+        <select id="radius">
+          <option value="200">2 min (~200m)</option>
+          <option value="400" selected>5 min (~400m)</option>
+          <option value="600">7 min (~600m)</option>
+        </select>
+      </div>
+
+      <button class="btn" id="goBtn" onclick="run()">
+        <span class="bt">PLAN SAFE ROUTE</span>
+        <div class="sp"></div>
+      </button>
+
+      <div class="status" id="status"></div>
+
+      <!-- SCORE -->
+      <div class="score-wrap" id="scoreWrap">
+        <div class="score-top">
+          <div>
+            <div class="score-pct" id="scorePct">—</div>
+            <div class="score-label">Route coverage</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:10px;color:var(--muted)">Route length</div>
+            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px" id="routeDist">—</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px">Walk time</div>
+            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px" id="routeTime">—</div>
+          </div>
+        </div>
+        <div class="score-bar-track">
+          <div class="score-bar-fill" id="scoreBar" style="width:0%"></div>
+        </div>
+        <div class="score-meta">
+          <div class="smeta">
+            <div class="smeta-v" id="metaShelters">0</div>
+            <div class="smeta-l">Miklatim</div>
+          </div>
+          <div class="smeta">
+            <div class="smeta-v" id="metaGaps" style="color:var(--red)">0</div>
+            <div class="smeta-l">Gap segments</div>
+          </div>
+          <div class="smeta">
+            <div class="smeta-v" id="metaGapDist">—</div>
+            <div class="smeta-l">Exposed dist.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GAP WARNINGS -->
+      <div id="gapSection" style="display:none">
+        <div class="section-head">⚠ Coverage gaps</div>
+        <div id="gapList"></div>
+      </div>
+
+      <!-- SHELTER LIST -->
+      <div id="shelterSection" style="display:none">
+        <div class="section-head">Miklatim on route</div>
+        <div id="shelterList"></div>
+        <div class="disc">
+          <strong>⚠ Safety notice:</strong> Data from OpenStreetMap & Google Places. Coverage may be incomplete. Always verify shelter locations locally. Do not rely solely on this app in an emergency.
+        </div>
+      </div>
+
+      <div class="empty" id="emptyState">
+        <div class="empty-icon">🗺️</div>
+        <div class="empty-txt">Enter a start and end point.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── MAP ── -->
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="legend" id="legend">
+      <div class="legend-title">Legend</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--green);border:1.5px solid var(--ink)"></div> Start point</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--red);border:1.5px solid var(--ink)"></div> End point</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--blue);border:1.5px solid var(--ink)"></div> Miklat (מקלט)</div>
+      <div class="leg-row"><div class="leg-line" style="background:var(--ink)"></div> Safe route</div>
+      <div class="leg-row"><div class="leg-line" style="background:var(--red)"></div> Coverage gap</div>
+      <div class="leg-row">
+        <div style="width:22px;height:14px;border-radius:7px;background:var(--safe-fill);border:1.5px solid var(--safe-stroke);flex-shrink:0"></div>
+        Shelter radius
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let map, dirSvc, dirRenderer, placesSvc;
+let mapsReady = false;
+let mapObjects = []; // circles, polylines, markers to clear
+
+// ═══════════════════════════════════════════════════════
+//  MAPS LOADER
+// ═══════════════════════════════════════════════════════
+function loadMaps(key) {
+  const old = document.getElementById('_gms');
+  if (old) { old.remove(); delete window.google; mapsReady = false; }
+  return new Promise((res, rej) => {
+    window.__mapsLoaded = () => { mapsReady = true; res(); };
+    const s = document.createElement('script');
+    s.id = '_gms';
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places,geometry&callback=__mapsLoaded&language=iw`;
+    s.onerror = () => rej(new Error('Failed to load Google Maps — check your API key and that Maps JS API + Places API + Directions API are enabled.'));
+    document.head.appendChild(s);
+  });
+}
+
+function initMap() {
+  map = new google.maps.Map(document.getElementById('map'), {
+    center: { lat: 32.08, lng: 34.78 },
+    zoom: 13,
+    disableDefaultUI: false,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    styles: [
+      { featureType:'all', elementType:'geometry', stylers:[{color:'#f2ede4'}] },
+      { featureType:'water', elementType:'geometry', stylers:[{color:'#c3dff0'}] },
+      { featureType:'road', elementType:'geometry', stylers:[{color:'#ffffff'}] },
+      { featureType:'road.arterial', elementType:'geometry', stylers:[{color:'#e8e0d0'}] },
+      { featureType:'road.highway', elementType:'geometry', stylers:[{color:'#d6ccbc'}] },
+      { featureType:'poi', elementType:'labels', stylers:[{visibility:'off'}] },
+      { featureType:'landscape.man_made', elementType:'geometry', stylers:[{color:'#ece6dc'}] },
+    ],
+  });
+  dirSvc = new google.maps.DirectionsService();
+  dirRenderer = new google.maps.DirectionsRenderer({
+    suppressMarkers: true,
+    preserveViewport: true,
+    polylineOptions: { strokeOpacity: 0 }, // we draw our own coloured polyline
+  });
+  dirRenderer.setMap(map);
+  placesSvc = new google.maps.places.PlacesService(map);
+
+  // Autocomplete restricted to IL
+  ['origin','dest'].forEach(id => {
+    new google.maps.places.Autocomplete(
+      document.getElementById(id),
+      { componentRestrictions: { country: 'il' } }
+    );
+  });
+  google.maps.event.trigger(map, 'resize');
+}
+
+// ═══════════════════════════════════════════════════════
+//  MAIN ENTRY
+// ═══════════════════════════════════════════════════════
+async function run() {
+  const orig = document.getElementById('origin').value.trim();
+  const dest = document.getElementById('dest').value.trim();
+  const radius = parseInt(document.getElementById('radius').value);
+
+  if (!orig || !dest) return setStatus('Enter both a start and end point.', 'err');
+
+  setBusy(true);
+  try {
+    if (!mapsReady) {
+      setStatus('Loading configuration…', 'info');
+      const res = await fetch('/api/config');
+      if (!res.ok) throw new Error('Could not load API config. Is GOOGLE_MAPS_API_KEY set in Vercel?');
+      const { key } = await res.json();
+      setStatus('Loading Google Maps…', 'info');
+      await loadMaps(key);
+      initMap();
+    }
+
+    clearAll();
+    setStatus('Getting walking route…', 'info');
+
+    // 1. Direct route (to understand the corridor)
+    const directRoute = await getRoute(orig, dest);
+    if (!directRoute) return;
+
+    // 2. Fetch all shelters in the bounding box + buffer
+    setStatus('Fetching מקלטים from OpenStreetMap…', 'info');
+    const bbox = getPathBbox(directRoute.path, 0.012); // ~1.2km buffer
+    const shelters = await fetchAllShelters(bbox);
+    setStatus(`Found ${shelters.length} miklatim. Analysing coverage…`, 'info');
+
+    // 3. Build shelter-aware route using waypoints
+    const { waypointRoute, usedShelters } = await buildShelterRoute(
+      orig, dest, directRoute, shelters, radius
+    );
+    const finalRoute = waypointRoute || directRoute;
+
+    // 4. Colour the route by coverage
+    const { coveredPct, gaps, coveredPolyline, gapPolylines } =
+      analyseRouteCoverage(finalRoute.path, shelters, radius);
+
+    // 5. Draw everything
+    drawRoute(coveredPolyline, gapPolylines);
+    drawShelterCircles(shelters, radius);
+    drawShelterMarkers(shelters, usedShelters);
+    drawEndpoints(finalRoute);
+    fitAll(finalRoute, shelters);
+
+    // 6. UI
+    renderScore(coveredPct, gaps, finalRoute, shelters.length);
+    renderShelterList(shelters, finalRoute.path, radius);
+    renderGaps(gaps);
+
+    document.getElementById('legend').classList.add('show');
+    document.getElementById('emptyState').style.display = 'none';
+
+    const pctLabel = coveredPct >= 99 ? '✓ Fully covered route' :
+                     `${coveredPct}% of route within shelter radius`;
+    setStatus(pctLabel, coveredPct >= 99 ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
+
+  } catch(e) {
+    console.error(e);
+    setStatus(e.message, 'err');
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  STEP 1: GET DIRECT ROUTE
+// ═══════════════════════════════════════════════════════
+function getRoute(origin, destination, waypoints) {
+  return new Promise((res) => {
+    const req = {
+      origin,
+      destination,
+      travelMode: google.maps.TravelMode.WALKING,
+    };
+    if (waypoints && waypoints.length) {
+      req.waypoints = waypoints.map(w => ({ location: w, stopover: false }));
+      req.optimizeWaypoints = false;
+    }
+    dirSvc.route(req, (result, status) => {
+      if (status !== 'OK') {
+        setStatus(`Route error: ${status}`, 'err');
+        return res(null);
+      }
+      const leg0 = result.routes[0].legs[0];
+      const lastLeg = result.routes[0].legs[result.routes[0].legs.length - 1];
+      // Merge all leg steps into one polyline
+      let allPoints = [];
+      for (const leg of result.routes[0].legs) {
+        for (const step of leg.steps) {
+          const pts = google.maps.geometry.encoding.decodePath(step.polyline.points);
+          allPoints = allPoints.concat(pts);
+        }
+      }
+      res({
+        result,
+        path: allPoints,
+        distance: leg0.distance.text,
+        duration: leg0.duration.text,
+        totalDistance: result.routes[0].legs.reduce((s, l) => s + l.distance.value, 0),
+        totalDuration: result.routes[0].legs.reduce((s, l) => s + l.duration.value, 0),
+        startLocation: leg0.start_location,
+        endLocation: lastLeg.end_location,
+      });
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  STEP 2: FETCH ALL SHELTERS (OSM + Google Places)
+// ═══════════════════════════════════════════════════════
+async function fetchAllShelters(bbox) {
+  const foundIds = new Set();
+  const shelters = [];
+
+  // ── OSM Overpass ──
+  try {
+    const { south, west, north, east } = bbox;
+    const q = `[out:json][timeout:15];
+(
+  node["amenity"="shelter"](${south},${west},${north},${east});
+  node["shelter_type"="public"](${south},${west},${north},${east});
+  node["building"="bunker"](${south},${west},${north},${east});
+  node["name"~"מקלט",i](${south},${west},${north},${east});
+  node["name"~"miklat",i](${south},${west},${north},${east});
+  way["amenity"="shelter"](${south},${west},${north},${east});
+  way["name"~"מקלט",i](${south},${west},${north},${east});
+);
+out center body;`;
+    const r = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:q });
+    const d = await r.json();
+    for (const el of (d.elements || [])) {
+      const lat = el.lat ?? el.center?.lat;
+      const lon = el.lon ?? el.center?.lon;
+      if (!lat || !lon) continue;
+      const id = `osm-${el.id}`;
+      if (foundIds.has(id)) continue;
+      foundIds.add(id);
+      shelters.push({
+        id, lat, lon,
+        name: el.tags?.['name:he'] || el.tags?.name || 'מקלט ציבורי',
+        addr: el.tags?.['addr:street']
+          ? `${el.tags['addr:street']} ${el.tags['addr:housenumber']||''}`.trim()
+          : '',
+        source: 'osm',
+        location: new google.maps.LatLng(lat, lon),
+      });
+    }
+  } catch(e) { console.warn('OSM failed', e); }
+
+  // ── Google Places ──
+  const center = {
+    lat: (bbox.south + bbox.north) / 2,
+    lng: (bbox.west  + bbox.east)  / 2,
+  };
+  const radius = Math.max(
+    google.maps.geometry.spherical.computeDistanceBetween(
+      new google.maps.LatLng(bbox.south, bbox.west),
+      new google.maps.LatLng(bbox.north, bbox.east)
+    ) / 2, 500
+  );
+
+  const queries = ['מקלט', 'bomb shelter miklat'];
+  for (const kw of queries) {
+    const results = await placesNearby(center, Math.min(radius, 3000), kw);
+    for (const p of results) {
+      if (foundIds.has(p.place_id)) continue;
+      foundIds.add(p.place_id);
+      const ll = p.geometry.location;
+      shelters.push({
+        id: p.place_id,
+        lat: ll.lat(), lon: ll.lng(),
+        name: p.name,
+        addr: p.vicinity || '',
+        source: 'google',
+        location: ll,
+      });
+    }
+  }
+
+  return shelters;
+}
+
+function placesNearby(center, radius, keyword) {
+  return new Promise(res => {
+    placesSvc.nearbySearch({ location: center, radius, keyword },
+      (r, s) => res((s === 'OK' || s === 'ZERO_RESULTS') ? (r || []) : [])
+    );
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  STEP 3: BUILD SHELTER-AWARE ROUTE
+//  Strategy: find gap segments in direct route, inject
+//  nearest shelter as waypoint to divert through coverage.
+//  Respect Google's 25-waypoint limit.
+// ═══════════════════════════════════════════════════════
+async function buildShelterRoute(orig, dest, directRoute, shelters, radius) {
+  if (!shelters.length) return { waypointRoute: null, usedShelters: [] };
+
+  // Find points on the direct route that are NOT covered
+  const gapPoints = directRoute.path.filter(p =>
+    !isPointCovered(p, shelters, radius)
+  );
+
+  if (!gapPoints.length) {
+    // Direct route is already fully covered — no waypoints needed
+    return { waypointRoute: directRoute, usedShelters: [] };
+  }
+
+  // For each gap point, find the nearest shelter
+  // Cluster gap points and pick up to 23 unique shelter waypoints
+  const waypointShelterSet = new Set();
+  const waypointShelters = [];
+
+  for (const pt of gapPoints) {
+    let nearest = null, nearestD = Infinity;
+    for (const s of shelters) {
+      const d = google.maps.geometry.spherical.computeDistanceBetween(pt, s.location);
+      if (d < nearestD) { nearestD = d; nearest = s; }
+    }
+    if (nearest && !waypointShelterSet.has(nearest.id) && nearestD < radius * 4) {
+      waypointShelterSet.add(nearest.id);
+      waypointShelters.push(nearest);
+    }
+    if (waypointShelters.length >= 23) break;
+  }
+
+  if (!waypointShelters.length) return { waypointRoute: null, usedShelters: [] };
+
+  setStatus(`Routing through ${waypointShelters.length} shelter waypoints…`, 'info');
+
+  try {
+    const waypoints = waypointShelters.map(s =>
+      new google.maps.LatLng(s.lat, s.lon)
+    );
+    const wpRoute = await getRoute(orig, dest, waypoints);
+    return { waypointRoute: wpRoute, usedShelters: waypointShelters };
+  } catch(e) {
+    console.warn('Waypoint route failed, falling back', e);
+    return { waypointRoute: directRoute, usedShelters: [] };
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  STEP 4: ANALYSE COVERAGE — split path into
+//  covered (green/black) vs gap (red) segments
+// ═══════════════════════════════════════════════════════
+function analyseRouteCoverage(path, shelters, radius) {
+  if (!path.length) return { coveredPct: 0, gaps: [], coveredPolyline: [], gapPolylines: [] };
+
+  // Tag each path point
+  const tags = path.map(p => isPointCovered(p, shelters, radius));
+
+  // Split into runs of covered / gap
+  const runs = [];
+  let cur = { covered: tags[0], points: [path[0]] };
+  for (let i = 1; i < path.length; i++) {
+    if (tags[i] === cur.covered) {
+      cur.points.push(path[i]);
+    } else {
+      runs.push(cur);
+      cur = { covered: tags[i], points: [path[i-1], path[i]] }; // overlap for continuity
+    }
+  }
+  runs.push(cur);
+
+  // Measure distances
+  let coveredDist = 0, gapDist = 0;
+  const coveredSegs = [], gapSegs = [], gaps = [];
+
+  for (const run of runs) {
+    let d = 0;
+    for (let i = 1; i < run.points.length; i++)
+      d += google.maps.geometry.spherical.computeDistanceBetween(run.points[i-1], run.points[i]);
+
+    if (run.covered) {
+      coveredDist += d;
+      coveredSegs.push(run.points);
+    } else {
+      gapDist += d;
+      gapSegs.push(run.points);
+      gaps.push({ points: run.points, distMeters: Math.round(d) });
+    }
+  }
+
+  const total = coveredDist + gapDist;
+  const coveredPct = total > 0 ? Math.round((coveredDist / total) * 100) : 100;
+
+  return { coveredPct, gaps, coveredPolyline: coveredSegs, gapPolylines: gapSegs, gapDist: Math.round(gapDist) };
+}
+
+function isPointCovered(point, shelters, radius) {
+  for (const s of shelters) {
+    if (google.maps.geometry.spherical.computeDistanceBetween(point, s.location) <= radius)
+      return true;
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════════════════════
+function drawRoute(coveredSegs, gapSegs) {
+  for (const pts of coveredSegs) {
+    const pl = new google.maps.Polyline({
+      path: pts, map,
+      strokeColor: '#0f0f0f',
+      strokeWeight: 5,
+      strokeOpacity: 0.9,
+      zIndex: 4,
+    });
+    mapObjects.push(pl);
+  }
+  for (const pts of gapSegs) {
+    const pl = new google.maps.Polyline({
+      path: pts, map,
+      strokeColor: '#D93B22',
+      strokeWeight: 5,
+      strokeOpacity: 0.95,
+      zIndex: 5,
+      icons: [{
+        icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+        offset: '0', repeat: '12px',
+      }],
+    });
+    mapObjects.push(pl);
+  }
+}
+
+function drawShelterCircles(shelters, radius) {
+  for (const s of shelters) {
+    const c = new google.maps.Circle({
+      center: s.location, radius, map,
+      fillColor: '#18C96A', fillOpacity: 0.10,
+      strokeColor: '#18C96A', strokeOpacity: 0.45,
+      strokeWeight: 1.5, zIndex: 1,
+    });
+    mapObjects.push(c);
+  }
+}
+
+function drawShelterMarkers(shelters, usedShelters) {
+  const usedIds = new Set(usedShelters.map(s => s.id));
+  shelters.forEach((s, i) => {
+    const isWaypoint = usedIds.has(s.id);
+    const marker = new google.maps.Marker({
+      position: s.location, map,
+      title: s.name,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: isWaypoint ? 10 : 7,
+        fillColor: '#1A4DE8',
+        fillOpacity: 1,
+        strokeColor: isWaypoint ? '#0f0f0f' : '#fff',
+        strokeWeight: isWaypoint ? 2.5 : 1.5,
+      },
+      zIndex: isWaypoint ? 12 : 8,
+    });
+    const iw = new google.maps.InfoWindow({
+      content: `<div style="font-family:'DM Mono',monospace;font-size:12px;padding:2px 4px;max-width:220px">
+        <b style="font-family:'Syne',sans-serif;font-size:13px">${s.name}</b><br>
+        ${s.addr ? `<span style="color:#888">${s.addr}</span><br>` : ''}
+        <span style="color:#1A4DE8;font-size:11px">${isWaypoint ? '★ Route waypoint' : 'Nearby shelter'}</span><br>
+        <span style="color:#aaa;font-size:10px">Source: ${s.source === 'osm' ? 'OpenStreetMap' : 'Google Places'}</span>
+      </div>`
+    });
+    marker.addListener('click', () => {
+      closeAllIW();
+      iw.open(map, marker);
+      highlightCard(i);
+    });
+    mapObjects.push(marker);
+    mapObjects.push(iw);
+    s._marker = marker;
+    s._iw = iw;
+    s._idx = i;
+  });
+}
+
+function drawEndpoints(route) {
+  [
+    { pos: route.startLocation, color: '#18C96A', title: 'Start' },
+    { pos: route.endLocation,   color: '#D93B22', title: 'End'   },
+  ].forEach(({ pos, color, title }) => {
+    const m = new google.maps.Marker({
+      position: pos, map, title,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 11,
+        fillColor: color, fillOpacity: 1,
+        strokeColor: '#0f0f0f', strokeWeight: 2.5,
+      },
+      zIndex: 20,
+    });
+    mapObjects.push(m);
+  });
+}
+
+function fitAll(route, shelters) {
+  const bounds = new google.maps.LatLngBounds();
+  route.path.forEach(p => bounds.extend(p));
+  shelters.forEach(s => bounds.extend(s.location));
+  map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+}
+
+// ═══════════════════════════════════════════════════════
+//  UI RENDERING
+// ═══════════════════════════════════════════════════════
+function renderScore(pct, gaps, route, shelterCount) {
+  const wrap = document.getElementById('scoreWrap');
+  wrap.classList.add('show');
+
+  const el = document.getElementById('scorePct');
+  el.textContent = `${pct}%`;
+  el.className = 'score-pct ' + (pct >= 99 ? 'full' : pct >= 80 ? 'high' : pct >= 50 ? 'mid' : 'low');
+
+  const bar = document.getElementById('scoreBar');
+  bar.style.width = `${pct}%`;
+  bar.style.background = pct >= 99 ? '#18C96A' : pct >= 80 ? '#8BC34A' : pct >= 50 ? '#E8920F' : '#D93B22';
+
+  // Route totals
+  const totalSec = route.totalDuration || 0;
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const timeStr = h > 0 ? `${h}h ${m}m` : `${m} min`;
+  const distM = route.totalDistance || 0;
+  const distStr = distM >= 1000 ? `${(distM/1000).toFixed(1)} km` : `${distM} m`;
+
+  document.getElementById('routeDist').textContent = distStr;
+  document.getElementById('routeTime').textContent = timeStr;
+  document.getElementById('metaShelters').textContent = shelterCount;
+
+  const gapCount = gaps.length;
+  const gapDistTotal = gaps.reduce((s, g) => s + g.distMeters, 0);
+  document.getElementById('metaGaps').textContent = gapCount;
+  document.getElementById('metaGapDist').textContent =
+    gapDistTotal > 0 ? (gapDistTotal >= 1000 ? `${(gapDistTotal/1000).toFixed(1)}km` : `${gapDistTotal}m`) : '0m';
+}
+
+function renderGaps(gaps) {
+  const sec = document.getElementById('gapSection');
+  const list = document.getElementById('gapList');
+  if (!gaps.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  list.innerHTML = '';
+  gaps.forEach((g, i) => {
+    const walkSec = Math.round(g.distMeters / 1.4);
+    const walkMin = Math.ceil(walkSec / 60);
+    const div = document.createElement('div');
+    div.className = 'gap-card';
+    div.innerHTML = `<strong>Gap ${i+1}</strong> — ${g.distMeters}m with no shelter within radius (~${walkMin} min exposed)`;
+    div.addEventListener('click', () => {
+      const mid = g.points[Math.floor(g.points.length/2)];
+      map.panTo(mid); map.setZoom(16);
+    });
+    list.appendChild(div);
+  });
+}
+
+function renderShelterList(shelters, path, radius) {
+  const sec = document.getElementById('shelterSection');
+  const list = document.getElementById('shelterList');
+  if (!shelters.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  list.innerHTML = '';
+
+  // Only show shelters actually near the route
+  const nearby = shelters
+    .map(s => ({ ...s, routeDist: minDistToPath(s.location, path) }))
+    .filter(s => s.routeDist <= radius * 1.5)
+    .sort((a, b) => a.routeDist - b.routeDist);
+
+  nearby.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.id = `scard-${s._idx}`;
+    const walkMin = Math.ceil(s.routeDist / 80);
+    card.innerHTML = `
+      <div class="s-card-row">
+        <div class="s-num">${i+1}</div>
+        <div class="s-name">${s.name}</div>
+        <div class="s-dist">${walkMin}′</div>
+      </div>
+      ${s.addr ? `<div class="s-addr">${s.addr}</div>` : ''}
+    `;
+    card.addEventListener('click', () => {
+      map.panTo(s.location); map.setZoom(17);
+      closeAllIW();
+      s._iw?.open(map, s._marker);
+      highlightCard(s._idx);
+    });
+    list.appendChild(card);
+  });
+}
+
+function highlightCard(idx) {
+  document.querySelectorAll('.s-card').forEach(c => {
+    c.classList.toggle('active', c.id === `scard-${idx}`);
+  });
+  document.getElementById(`scard-${idx}`)?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+// ═══════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════
+function minDistToPath(point, path) {
+  let min = Infinity;
+  for (const p of path) {
+    const d = google.maps.geometry.spherical.computeDistanceBetween(point, p);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
+function getPathBbox(path, bufDeg = 0.005) {
+  let s = Infinity, n = -Infinity, w = Infinity, e = -Infinity;
+  for (const p of path) {
+    const lat = p.lat(), lng = p.lng();
+    if (lat < s) s = lat; if (lat > n) n = lat;
+    if (lng < w) w = lng; if (lng > e) e = lng;
+  }
+  return { south: s-bufDeg, north: n+bufDeg, west: w-bufDeg, east: e+bufDeg };
+}
+
+function closeAllIW() {
+  mapObjects.forEach(o => { if (o instanceof google.maps.InfoWindow) o.close(); });
+}
+
+function clearAll() {
+  mapObjects.forEach(o => {
+    if (o.setMap) o.setMap(null);
+    else if (o.close) o.close();
+  });
+  mapObjects = [];
+  if (dirRenderer) dirRenderer.setDirections({ routes: [] });
+
+  document.getElementById('scoreWrap').classList.remove('show');
+  document.getElementById('shelterSection').style.display = 'none';
+  document.getElementById('gapSection').style.display = 'none';
+  document.getElementById('shelterList').innerHTML = '';
+  document.getElementById('gapList').innerHTML = '';
+  document.getElementById('legend').classList.remove('show');
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+function setStatus(msg, type = '') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+function setBusy(b) {
+  const btn = document.getElementById('goBtn');
+  btn.classList.toggle('loading', b);
+  btn.disabled = b;
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+</script>
+</body>
+</html>
