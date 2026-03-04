@@ -351,61 +351,126 @@
     .iw-review { font-size: 10px; color: #666; margin-bottom: 4px; line-height: 1.4; }
     .iw-review .iw-r-stars { color: var(--amber); font-size: 9px; }
 
-    /* ── MOBILE TOGGLE BUTTON ── */
-    .mobile-toggle {
+    /* ── MOBILE TOGGLE BUTTON (legacy, hidden) ── */
+    .mobile-toggle { display: none; }
+
+    /* ── MOBILE: FLOATING SEARCH BAR ── */
+    .mobile-search {
       display: none;
-      position: absolute; top: 12px; left: 12px; z-index: 50;
-      width: 40px; height: 40px;
-      background: var(--ink); color: var(--paper);
-      border: none; border-radius: 2px;
-      font-size: 20px; line-height: 1;
-      cursor: pointer; box-shadow: 2px 2px 0 rgba(0,0,0,0.15);
-      align-items: center; justify-content: center;
+      position: absolute; top: 0; left: 0; right: 0;
+      z-index: 50; padding: 12px 12px 0;
+      pointer-events: none;
     }
+    .mobile-search > * { pointer-events: auto; }
+    .mobile-search-card {
+      background: var(--white);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+      padding: 10px 12px;
+    }
+    .mobile-search-header {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    }
+    .mobile-search-header .logo {
+      font-size: 13px; gap: 5px;
+    }
+    .mobile-search-header .logo-shield {
+      width: 20px; height: 20px; font-size: 9px;
+    }
+    .mobile-search-inputs {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .mobile-search-row {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .mobile-search-row .field-dot {
+      position: static; transform: none;
+      width: 8px; height: 8px; flex-shrink: 0;
+    }
+    .mobile-search-row input {
+      flex: 1; border: 1px solid var(--border); background: var(--paper);
+      font-family: 'DM Mono', monospace; font-size: 13px;
+      padding: 9px 10px; border-radius: 6px; color: var(--ink); outline: none;
+    }
+    .mobile-search-row input:focus { border-color: var(--blue); background: var(--white); }
+    .mobile-search-row input::placeholder { color: var(--muted); }
+    .mobile-search-actions {
+      display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    }
+    .mobile-search-actions select {
+      font-size: 12px; border-radius: 6px; padding: 6px 8px; flex: 1;
+      border: 1px solid var(--border); background: var(--paper);
+    }
+    .mobile-search-actions .btn {
+      margin-top: 0; flex: 1; padding: 9px; font-size: 12px; border-radius: 6px;
+    }
+
+    /* ── MOBILE: BOTTOM SHEET ── */
+    .bottom-sheet {
+      display: none;
+      position: absolute; bottom: 0; left: 0; right: 0;
+      z-index: 45;
+      background: var(--white);
+      border-radius: 14px 14px 0 0;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.12);
+      max-height: 85vh;
+      transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      will-change: transform;
+      touch-action: none;
+    }
+    .bottom-sheet.no-transition { transition: none; }
+    .bottom-sheet .drag-handle {
+      display: flex; justify-content: center; padding: 10px 0 6px;
+      cursor: grab;
+    }
+    .bottom-sheet .drag-handle::after {
+      content: ''; width: 36px; height: 4px;
+      background: var(--border); border-radius: 2px;
+    }
+    .bottom-sheet-content {
+      overflow-y: auto; padding: 0 16px 20px;
+      max-height: calc(85vh - 30px);
+      -webkit-overflow-scrolling: touch;
+    }
+    .bottom-sheet-content::-webkit-scrollbar { width: 0; }
+
+    /* ── MOBILE: STATUS PILL ── */
+    .mobile-status {
+      display: none; font-size: 11px; color: var(--muted);
+      text-align: center; padding: 4px 0 2px;
+    }
+    .mobile-status.err { color: var(--red); }
+    .mobile-status.info { color: var(--blue); }
+    .mobile-status.ok { color: var(--green); }
 
     /* ── MOBILE RESPONSIVE ── */
     @media (max-width: 768px) {
-      .header-tag { display: none; }
-      header { height: 44px; padding: 0 12px; }
-      .logo { font-size: 15px; }
-      .logo-shield { width: 22px; height: 22px; font-size: 10px; }
+      header { display: none; }
 
-      .app { flex-direction: column-reverse; position: relative; }
+      body { display: flex; flex-direction: column; }
 
-      .map-wrap { flex: 1; min-height: 0; }
+      .app {
+        flex: 1; position: relative;
+        display: flex; flex-direction: column;
+      }
+
+      .map-wrap { flex: 1; min-height: 0; position: relative; }
       #map { width: 100%; height: 100%; }
 
-      .mobile-toggle { display: flex; }
+      /* Hide desktop sidebar on mobile */
+      .sidebar { display: none !important; }
 
-      .sidebar {
-        width: 100%;
-        border-right: none;
-        border-top: 1.5px solid var(--ink);
-        position: absolute;
-        bottom: 0; left: 0; right: 0;
-        z-index: 40;
-        max-height: 55vh;
-        transform: translateY(100%);
-        transition: transform 0.3s ease;
-      }
-      .sidebar.open {
-        transform: translateY(0);
-      }
-
-      .sidebar-scroll { padding: 14px 12px; }
+      /* Show mobile-specific UI */
+      .mobile-search { display: block; }
+      .bottom-sheet { display: block; }
+      .mobile-status { display: block; }
 
       .legend {
-        bottom: 10px; right: 10px;
-        padding: 8px 10px;
-        font-size: 10px;
-        min-width: 140px;
+        bottom: auto; top: unset; right: 10px;
+        padding: 8px 10px; font-size: 10px; min-width: 140px;
+        border-radius: 6px; border: 1px solid var(--border);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
       }
-
-      input[type=text], input[type=password] { font-size: 14px; padding: 12px 12px 12px 30px; }
-      input[type=text].plain, input[type=password].plain { padding-left: 12px; }
-      select { font-size: 14px; padding: 8px 10px; }
-      .btn { padding: 13px; font-size: 14px; }
-      .radius-row label { font-size: 12px; }
     }
   </style>
 </head>
@@ -519,7 +584,50 @@
 
   <!-- ── MAP ── -->
   <div class="map-wrap">
-    <button class="mobile-toggle" id="mobileToggle" onclick="toggleSidebar()" aria-label="Toggle panel">☰</button>
+    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle panel">☰</button>
+
+    <!-- ── MOBILE: Floating search bar ── -->
+    <div class="mobile-search" id="mobileSearch">
+      <div class="mobile-search-card">
+        <div class="mobile-search-header">
+          <div class="logo">
+            <div class="logo-shield">🛡</div>
+            Miklat
+          </div>
+        </div>
+        <div class="mobile-search-inputs">
+          <div class="mobile-search-row">
+            <div class="field-dot s"></div>
+            <input type="text" id="mobileOrigin" placeholder="Start…"/>
+          </div>
+          <div class="mobile-search-row">
+            <div class="field-dot e"></div>
+            <input type="text" id="mobileDest" placeholder="Destination…"/>
+          </div>
+        </div>
+        <div class="mobile-search-actions">
+          <select id="mobileRadius">
+            <option value="200">~200m</option>
+            <option value="400" selected>~400m</option>
+            <option value="600">~600m</option>
+          </select>
+          <button class="btn" id="mobileGoBtn" onclick="run()">
+            <span class="bt">PLAN ROUTE</span>
+            <div class="sp"></div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MOBILE: Bottom sheet ── -->
+    <div class="bottom-sheet" id="bottomSheet">
+      <div class="drag-handle" id="dragHandle"></div>
+      <div class="mobile-status" id="mobileStatusBar"></div>
+      <div class="bottom-sheet-content" id="bottomSheetContent">
+        <!-- Filled dynamically after route planning -->
+      </div>
+    </div>
+
     <div id="map"></div>
     <div class="legend" id="legend">
       <div class="legend-title">Legend</div>
@@ -594,15 +702,188 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ═══════════════════════════════════════════════════════
-//  MOBILE SIDEBAR TOGGLE
+//  MOBILE: BOTTOM SHEET (Google Maps-style)
 // ═══════════════════════════════════════════════════════
-function toggleSidebar() {
-  const sb = document.querySelector('.sidebar');
-  const btn = document.getElementById('mobileToggle');
-  sb.classList.toggle('open');
-  btn.textContent = sb.classList.contains('open') ? '✕' : '☰';
-  if (map) google.maps.event.trigger(map, 'resize');
+const SHEET_PEEK = 120;   // px – just score summary visible
+const SHEET_HALF = 0.45;  // 45% of viewport
+const SHEET_FULL = 0.85;  // 85% of viewport
+
+let sheetState = 'hidden'; // hidden | peek | half | full
+let sheetDragY = 0;
+let sheetStartY = 0;
+let sheetStartTranslate = 0;
+
+function isMobile() { return window.innerWidth <= 768; }
+
+function getSheetEl() { return document.getElementById('bottomSheet'); }
+
+function setSheetPosition(state, animate) {
+  const sheet = getSheetEl();
+  if (!sheet) return;
+  sheetState = state;
+
+  if (animate !== false) {
+    sheet.classList.remove('no-transition');
+  } else {
+    sheet.classList.add('no-transition');
+  }
+
+  const vh = window.innerHeight;
+  let translateY;
+  switch (state) {
+    case 'peek': translateY = vh - SHEET_PEEK; break;
+    case 'half': translateY = vh * (1 - SHEET_HALF); break;
+    case 'full': translateY = vh * (1 - SHEET_FULL); break;
+    default:     translateY = vh; break; // hidden
+  }
+  sheet.style.transform = `translateY(${translateY}px)`;
+
+  // Allow scrolling only when fully open
+  const content = document.getElementById('bottomSheetContent');
+  if (content) content.style.overflowY = state === 'full' ? 'auto' : 'hidden';
 }
+
+function initBottomSheet() {
+  const handle = document.getElementById('dragHandle');
+  const sheet = getSheetEl();
+  if (!handle || !sheet) return;
+
+  let dragging = false;
+
+  handle.addEventListener('touchstart', (e) => {
+    dragging = true;
+    sheetStartY = e.touches[0].clientY;
+    const transform = getComputedStyle(sheet).transform;
+    const matrix = new DOMMatrix(transform);
+    sheetStartTranslate = matrix.m42;
+    sheet.classList.add('no-transition');
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    const dy = e.touches[0].clientY - sheetStartY;
+    const newY = Math.max(window.innerHeight * (1 - SHEET_FULL), sheetStartTranslate + dy);
+    sheet.style.transform = `translateY(${newY}px)`;
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (!dragging) return;
+    dragging = false;
+    sheet.classList.remove('no-transition');
+
+    const transform = getComputedStyle(sheet).transform;
+    const matrix = new DOMMatrix(transform);
+    const currentY = matrix.m42;
+    const vh = window.innerHeight;
+
+    // Snap to nearest state based on position
+    const peekY = vh - SHEET_PEEK;
+    const halfY = vh * (1 - SHEET_HALF);
+    const fullY = vh * (1 - SHEET_FULL);
+
+    // Also consider velocity direction from drag
+    const targets = [
+      { state: 'full', y: fullY },
+      { state: 'half', y: halfY },
+      { state: 'peek', y: peekY },
+    ];
+
+    let closest = targets[0];
+    for (const t of targets) {
+      if (Math.abs(currentY - t.y) < Math.abs(currentY - closest.y)) closest = t;
+    }
+
+    // If dragged below peek, allow hiding
+    if (currentY > peekY + 50) {
+      setSheetPosition('hidden');
+    } else {
+      setSheetPosition(closest.state);
+    }
+  });
+
+  // Start hidden
+  setSheetPosition('hidden', false);
+}
+
+// Sync mobile inputs with desktop inputs
+function syncInputs() {
+  if (!isMobile()) return;
+  const mo = document.getElementById('mobileOrigin');
+  const md = document.getElementById('mobileDest');
+  const mr = document.getElementById('mobileRadius');
+  if (mo) document.getElementById('origin').value = mo.value;
+  if (md) document.getElementById('dest').value = md.value;
+  if (mr) document.getElementById('radius').value = mr.value;
+}
+
+function syncInputsToMobile() {
+  const mo = document.getElementById('mobileOrigin');
+  const md = document.getElementById('mobileDest');
+  const mr = document.getElementById('mobileRadius');
+  if (mo) mo.value = document.getElementById('origin').value;
+  if (md) md.value = document.getElementById('dest').value;
+  if (mr) mr.value = document.getElementById('radius').value;
+}
+
+// Mobile status updates
+function setMobileStatus(msg, type) {
+  const el = document.getElementById('mobileStatusBar');
+  if (el) {
+    el.textContent = msg;
+    el.className = 'mobile-status' + (type ? ' ' + type : '');
+  }
+}
+
+// Populate bottom sheet content after route planning
+function populateBottomSheet() {
+  const content = document.getElementById('bottomSheetContent');
+  if (!content) return;
+
+  // Clone score, gaps, shelter list, and disclaimer from sidebar
+  content.innerHTML = '';
+
+  const scoreWrap = document.getElementById('scoreWrap');
+  if (scoreWrap) {
+    const clone = scoreWrap.cloneNode(true);
+    clone.id = 'mobileScoreWrap';
+    clone.classList.add('show');
+    content.appendChild(clone);
+  }
+
+  const gapSection = document.getElementById('gapSection');
+  if (gapSection && gapSection.style.display !== 'none') {
+    const clone = gapSection.cloneNode(true);
+    clone.id = 'mobileGapSection';
+    content.appendChild(clone);
+  }
+
+  const shelterSection = document.getElementById('shelterSection');
+  if (shelterSection && shelterSection.style.display !== 'none') {
+    const clone = shelterSection.cloneNode(true);
+    clone.id = 'mobileShelterSection';
+    // Re-wire click handlers on shelter cards
+    clone.querySelectorAll('.s-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const origCard = document.getElementById(card.id);
+        if (origCard) origCard.click();
+        // Collapse sheet to peek so map is visible
+        setSheetPosition('peek');
+      });
+    });
+    // Re-wire gap card clicks
+    clone.querySelectorAll('.gap-card').forEach((card, i) => {
+      const origCards = gapSection.querySelectorAll('.gap-card');
+      card.addEventListener('click', () => {
+        if (origCards[i]) origCards[i].click();
+        setSheetPosition('peek');
+      });
+    });
+    content.appendChild(clone);
+  }
+}
+
+// Legacy toggle (not used on mobile anymore)
+function toggleSidebar() {}
 
 // Tel Aviv Municipality ArcGIS endpoint for shelter layer 592
 const TLV_GIS_BASE = 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/WM/IView2WM/MapServer/592/query';
@@ -654,11 +935,14 @@ function initMap() {
   dirRenderer.setMap(map);
 
   // Autocomplete restricted to IL
-  ['origin','dest'].forEach(id => {
-    new google.maps.places.Autocomplete(
-      document.getElementById(id),
-      { componentRestrictions: { country: 'il' } }
-    );
+  ['origin','dest','mobileOrigin','mobileDest'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      new google.maps.places.Autocomplete(
+        el,
+        { componentRestrictions: { country: 'il' } }
+      );
+    }
   });
   google.maps.event.trigger(map, 'resize');
 }
@@ -667,16 +951,23 @@ function initMap() {
 //  MAIN ENTRY
 // ═══════════════════════════════════════════════════════
 async function run() {
+  // Sync mobile inputs to desktop fields
+  if (isMobile()) syncInputs();
+
   const origText = document.getElementById('origin').value.trim();
   const destText = document.getElementById('dest').value.trim();
   const radius = parseInt(document.getElementById('radius').value);
 
-  if (!origText || !destText) return setStatus('Enter both a start and end point.', 'err');
+  if (!origText || !destText) {
+    setStatus('Enter both a start and end point.', 'err');
+    if (isMobile()) setMobileStatus('Enter both a start and end point.', 'err');
+    return;
+  }
 
-  // On mobile, close sidebar so the map is visible while planning
-  if (window.innerWidth <= 768) {
-    document.querySelector('.sidebar').classList.remove('open');
-    document.getElementById('mobileToggle').textContent = '☰';
+  // On mobile, blur inputs so keyboard dismisses, show bottom sheet in peek
+  if (isMobile()) {
+    document.activeElement?.blur();
+    setSheetPosition('peek');
   }
 
   setBusy(true);
@@ -741,6 +1032,12 @@ async function run() {
     const pctLabel = coveredPct >= 99 ? '✓ Fully covered route' :
                      `${coveredPct}% of route within shelter radius`;
     setStatus(pctLabel, coveredPct >= 99 ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
+
+    // On mobile, populate the bottom sheet and show it in peek mode
+    if (isMobile()) {
+      populateBottomSheet();
+      setSheetPosition('peek');
+    }
 
   } catch(e) {
     console.error(e);
@@ -1116,7 +1413,9 @@ function fitAll(route, shelters) {
   const bounds = new google.maps.LatLngBounds();
   route.path.forEach(p => bounds.extend(p));
   shelters.forEach(s => bounds.extend(s.location));
-  map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+  const bottomPad = isMobile() ? SHEET_PEEK + 20 : 50;
+  const topPad = isMobile() ? 130 : 50;
+  map.fitBounds(bounds, { top: topPad, right: 50, bottom: bottomPad, left: 50 });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1340,18 +1639,25 @@ function clearAll() {
   document.getElementById('gapList').innerHTML = '';
   document.getElementById('legend').classList.remove('show');
   document.getElementById('emptyState').style.display = 'none';
+
+  // Clear mobile bottom sheet
+  const bsContent = document.getElementById('bottomSheetContent');
+  if (bsContent) bsContent.innerHTML = '';
 }
 
 function setStatus(msg, type = '') {
   const el = document.getElementById('status');
   el.textContent = msg;
   el.className = 'status ' + type;
+  if (isMobile()) setMobileStatus(msg, type);
 }
 
 function setBusy(b) {
   const btn = document.getElementById('goBtn');
   btn.classList.toggle('loading', b);
   btn.disabled = b;
+  const mBtn = document.getElementById('mobileGoBtn');
+  if (mBtn) { mBtn.classList.toggle('loading', b); mBtn.disabled = b; }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1425,6 +1731,23 @@ function minDistToPath(point, path) {
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+
+// Initialize bottom sheet drag on mobile
+document.addEventListener('DOMContentLoaded', () => {
+  if (isMobile()) {
+    initBottomSheet();
+    // Position legend above bottom sheet when visible
+    const legend = document.getElementById('legend');
+    if (legend) legend.style.bottom = (SHEET_PEEK + 10) + 'px';
+  }
+});
+
+// Re-init on resize (orientation change)
+window.addEventListener('resize', () => {
+  if (isMobile() && sheetState !== 'hidden') {
+    setSheetPosition(sheetState);
+  }
+});
 </script>
 </body>
 </html>
