@@ -1033,11 +1033,11 @@ async function renderShelterList(shelters, path, radius) {
   const effectiveRadius = radius / WALK_FACTOR;
   const nearby = shelters
     .map(s => {
-      const { dist, point } = closestOnPath(s.location, path);
-      return { ...s, routeDist: dist, nearestRoutePoint: point };
+      const { dist, point, pathIndex } = closestOnPath(s.location, path);
+      return { ...s, routeDist: dist, nearestRoutePoint: point, pathIndex };
     })
     .filter(s => s.routeDist <= effectiveRadius * 1.5)
-    .sort((a, b) => a.routeDist - b.routeDist);
+    .sort((a, b) => a.pathIndex - b.pathIndex);
 
   // Fetch actual walking distances from route to each shelter
   let walkData = [];
@@ -1117,12 +1117,12 @@ function highlightCard(idx) {
 //  HELPERS
 // ═══════════════════════════════════════════════════════
 function closestOnPath(point, path) {
-  let min = Infinity, closest = path[0];
-  for (const p of path) {
-    const d = google.maps.geometry.spherical.computeDistanceBetween(point, p);
-    if (d < min) { min = d; closest = p; }
+  let min = Infinity, closest = path[0], closestIdx = 0;
+  for (let i = 0; i < path.length; i++) {
+    const d = google.maps.geometry.spherical.computeDistanceBetween(point, path[i]);
+    if (d < min) { min = d; closest = path[i]; closestIdx = i; }
   }
-  return { dist: min, point: closest };
+  return { dist: min, point: closest, pathIndex: closestIdx };
 }
 
 // Fetch actual walking distances from route points to shelters via Distance Matrix API
