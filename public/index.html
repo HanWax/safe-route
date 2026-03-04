@@ -799,7 +799,6 @@ const SHEET_HALF = 0.45;  // 45% of viewport
 const SHEET_FULL = 0.85;  // 85% of viewport
 
 let sheetState = 'hidden'; // hidden | peek | half | full
-let sheetDragY = 0;
 let sheetStartY = 0;
 let sheetStartTranslate = 0;
 
@@ -911,19 +910,6 @@ function syncInputs() {
   }
 }
 
-function syncInputsToMobile() {
-  const mo = document.getElementById('mobileOrigin');
-  const md = document.getElementById('mobileDest');
-  const mr = document.getElementById('mobileRadius');
-  const mct = document.getElementById('mobileCoverageTarget');
-  const mctv = document.getElementById('mobileCoverageTargetVal');
-  if (mo) mo.value = document.getElementById('origin').value;
-  if (md) md.value = document.getElementById('dest').value;
-  if (mr) mr.value = document.getElementById('radius').value;
-  if (mct) mct.value = document.getElementById('coverageTarget').value;
-  if (mctv) mctv.textContent = document.getElementById('coverageTarget').value + '%';
-}
-
 // Mobile status updates
 function setMobileStatus(msg, type) {
   const el = document.getElementById('mobileStatusBar');
@@ -946,6 +932,13 @@ function populateBottomSheet() {
     const clone = scoreWrap.cloneNode(true);
     clone.id = 'mobileScoreWrap';
     clone.classList.add('show');
+    content.appendChild(clone);
+  }
+
+  const dragHint = document.getElementById('dragHint');
+  if (dragHint && dragHint.classList.contains('show')) {
+    const clone = dragHint.cloneNode(true);
+    clone.id = 'mobileDragHint';
     content.appendChild(clone);
   }
 
@@ -1103,7 +1096,7 @@ async function run() {
     setStatus(`Found ${shelters.length} miklatim. Optimising for ${coverageTarget}% coverage…`, 'info');
 
     // 3. Build shelter-aware route with coverage target
-    const { waypointRoute, usedShelters, achievedPct } = await buildShelterRoute(
+    const { waypointRoute, usedShelters } = await buildShelterRoute(
       orig, dest, directRoute, shelters, radius, coverageTarget
     );
     const finalRoute = waypointRoute || directRoute;
@@ -1525,7 +1518,7 @@ function reanalyseDraggedRoute(draggedRoute, shelters, radius) {
   renderGaps(gaps);
 
   const pctLabel = coveredPct >= coverageTarget
-    ? `✓ ${coveredPct}% coverage meets your ${coverageTarget}% target`
+    ? (coveredPct >= 99 ? '✓ Fully covered route' : `✓ ${coveredPct}% coverage meets your ${coverageTarget}% target`)
     : `${coveredPct}% coverage (target: ${coverageTarget}%) — keep dragging to improve`;
   setStatus(pctLabel, coveredPct >= coverageTarget ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
 
