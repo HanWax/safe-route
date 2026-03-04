@@ -457,6 +457,10 @@ let mapObjects = [];
 // Tel Aviv Municipality ArcGIS endpoint for shelter layer 592
 const TLV_GIS_BASE = 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/WM/IView2WM/MapServer/592/query';
 
+// Walking-distance correction factor: in urban grids, walking distance
+// is typically ~1.3× the straight-line distance.
+const WALK_FACTOR = 1.3;
+
 // ═══════════════════════════════════════════════════════
 //  MAPS LOADER
 // ═══════════════════════════════════════════════════════
@@ -556,14 +560,15 @@ async function run() {
 
     // 5. Draw
     drawRoute(coveredPolyline, gapPolylines);
-    drawShelterCircles(shelters, radius);
+    drawShelterCircles(shelters, radius / WALK_FACTOR);
     drawShelterMarkers(shelters, usedShelters);
     drawEndpoints(finalRoute);
     fitAll(finalRoute, shelters);
 
     // 6. UI
     renderScore(coveredPct, gaps, finalRoute, shelters.length);
-    renderShelterList(shelters, finalRoute.path, radius);
+    setStatus('Calculating walking distances…', 'info');
+    await renderShelterList(shelters, finalRoute.path, radius);
     renderGaps(gaps);
 
     document.getElementById('legend').classList.add('show');
@@ -714,7 +719,7 @@ async function buildShelterRoute(orig, dest, directRoute, shelters, radius) {
       const d = google.maps.geometry.spherical.computeDistanceBetween(pt, s.location);
       if (d < nearestD) { nearestD = d; nearest = s; }
     }
-    if (nearest && !waypointShelterSet.has(nearest.id) && nearestD < radius * 4) {
+    if (nearest && !waypointShelterSet.has(nearest.id) && nearestD < (radius * 4) / WALK_FACTOR) {
       waypointShelterSet.add(nearest.id);
       waypointShelters.push(nearest);
     }
@@ -782,8 +787,10 @@ function analyseRouteCoverage(path, shelters, radius) {
 }
 
 function isPointCovered(point, shelters, radius) {
+  // radius is walking distance; convert to straight-line equivalent
+  const effectiveRadius = radius / WALK_FACTOR;
   for (const s of shelters) {
-    if (google.maps.geometry.spherical.computeDistanceBetween(point, s.location) <= radius)
+    if (google.maps.geometry.spherical.computeDistanceBetween(point, s.location) <= effectiveRadius)
       return true;
   }
   return false;
@@ -963,23 +970,47 @@ function renderGaps(gaps) {
   });
 }
 
-function renderShelterList(shelters, path, radius) {
+async function renderShelterList(shelters, path, radius) {
   const sec = document.getElementById('shelterSection');
   const list = document.getElementById('shelterList');
   if (!shelters.length) { sec.style.display = 'none'; return; }
   sec.style.display = 'block';
   list.innerHTML = '';
 
+  const effectiveRadius = radius / WALK_FACTOR;
   const nearby = shelters
-    .map(s => ({ ...s, routeDist: minDistToPath(s.location, path) }))
-    .filter(s => s.routeDist <= radius * 1.5)
+    .map(s => {
+      const { dist, point } = closestOnPath(s.location, path);
+      return { ...s, routeDist: dist, nearestRoutePoint: point };
+    })
+    .filter(s => s.routeDist <= effectiveRadius * 1.5)
     .sort((a, b) => a.routeDist - b.routeDist);
+
+  // Fetch actual walking distances from route to each shelter
+  let walkData = [];
+  if (nearby.length) {
+    const origins = nearby.map(s => s.nearestRoutePoint);
+    const dests = nearby.map(s => s.location);
+    try {
+      walkData = await getWalkingDistances(origins, dests);
+    } catch (e) {
+      console.warn('Distance Matrix failed, using estimates', e);
+    }
+  }
 
   nearby.forEach((s, i) => {
     const card = document.createElement('div');
     card.className = 's-card';
     card.id = `scard-${s._idx}`;
-    const walkMin = Math.ceil(s.routeDist / 80);
+
+    // Use real walking data if available, else estimate with walk factor
+    const wd = walkData[i];
+    const walkMin = wd
+      ? Math.ceil(wd.duration.value / 60)
+      : Math.ceil((s.routeDist * WALK_FACTOR) / 80);
+    const distLabel = wd
+      ? wd.distance.text
+      : `~${Math.round(s.routeDist * WALK_FACTOR)}m`;
 
     // Build tags
     let tagsHtml = '';
@@ -1003,7 +1034,7 @@ function renderShelterList(shelters, path, radius) {
       <div class="s-card-row">
         <div class="s-num">${i+1}</div>
         <div class="s-name">${s.addr || s.type || s.name}</div>
-        <div class="s-dist">${walkMin}′</div>
+        <div class="s-dist">${walkMin}′ <span style="font-size:9px;color:var(--muted)">${distLabel}</span></div>
       </div>
       ${s.addr && s.addrEng ? `<div class="s-addr">${s.addrEng}</div>` : ''}
       ${tagsHtml}
@@ -1029,13 +1060,49 @@ function highlightCard(idx) {
 // ═══════════════════════════════════════════════════════
 //  HELPERS
 // ═══════════════════════════════════════════════════════
-function minDistToPath(point, path) {
-  let min = Infinity;
+function closestOnPath(point, path) {
+  let min = Infinity, closest = path[0];
   for (const p of path) {
     const d = google.maps.geometry.spherical.computeDistanceBetween(point, p);
-    if (d < min) min = d;
+    if (d < min) { min = d; closest = p; }
   }
-  return min;
+  return { dist: min, point: closest };
+}
+
+// Fetch actual walking distances from route points to shelters via Distance Matrix API
+async function getWalkingDistances(origins, destinations) {
+  const service = new google.maps.DistanceMatrixService();
+  const walkingData = new Array(origins.length).fill(null);
+  const batchSize = 10; // 10×10 = 100 elements per request (API limit)
+
+  for (let i = 0; i < origins.length; i += batchSize) {
+    const end = Math.min(i + batchSize, origins.length);
+    const batchOrigins = origins.slice(i, end);
+    const batchDests = destinations.slice(i, end);
+
+    const result = await new Promise((resolve) => {
+      service.getDistanceMatrix({
+        origins: batchOrigins,
+        destinations: batchDests,
+        travelMode: google.maps.TravelMode.WALKING,
+      }, (response, status) => {
+        resolve(status === 'OK' ? response : null);
+      });
+    });
+
+    if (result) {
+      for (let j = 0; j < result.rows.length; j++) {
+        const element = result.rows[j].elements[j]; // diagonal: origin[j] → dest[j]
+        if (element && element.status === 'OK') {
+          walkingData[i + j] = {
+            distance: element.distance, // { text: "350 m", value: 350 }
+            duration: element.duration, // { text: "4 mins", value: 252 }
+          };
+        }
+      }
+    }
+  }
+  return walkingData;
 }
 
 function getPathBbox(path, bufDeg = 0.005) {

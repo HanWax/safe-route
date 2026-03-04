@@ -29,6 +29,7 @@ Hosted on **Vercel**. The serverless function exists solely to keep the Google A
 | **Tel Aviv-Yafo Municipality GIS** — [ArcGIS REST, layer 592](https://gisn.tel-aviv.gov.il/arcgis/rest/services/WM/IView2WM/MapServer/592) | Shelter locations with type, status, accessibility, filtration, area, entrance notes | None — open public data |
 | **Google Maps JavaScript API** | Map rendering, geocoding, autocomplete, geometry calculations | API key |
 | **Google Directions API** | Walking route polylines and waypoint routing | Same key |
+| **Google Distance Matrix API** | Actual walking distances and times from route to shelters | Same key |
 | **Google Places API** | Address autocomplete on the input fields | Same key |
 
 Shelter metadata returned from the municipal GIS includes: shelter type (`t_sug`), street address in Hebrew and English, operational status (`pail`), wheelchair accessibility (`miklat_mungash`), filtration system type (`t_sinon`), area in m² (`shetach_mr`), opening hours, entrance directions in Hebrew (`hearot`), and open/closed status.
@@ -49,7 +50,7 @@ A bounding box is computed around the direct route with a ~1.2 km buffer. A spat
 
 ### 3. Shelter-aware re-routing
 
-Every point on the direct polyline is checked for coverage — whether any shelter lies within the user's chosen radius (200 m, 400 m, or 600 m). Uncovered points are collected as gaps. For each gap point, the nearest shelter is found by geodesic distance. Unique nearest shelters become candidate waypoints, excluding any further than 4x the radius. The list is capped at 23 (Google's limit is 25 total; 2 are reserved for origin/destination).
+Every point on the direct polyline is checked for coverage — whether any shelter lies within walking distance of the user's chosen radius (200 m, 400 m, or 600 m), using a 1.3× correction factor to convert straight-line to walking distance. Uncovered points are collected as gaps. For each gap point, the nearest shelter is found by geodesic distance. Unique nearest shelters become candidate waypoints, excluding any further than 4x the effective radius. The list is capped at 23 (Google's limit is 25 total; 2 are reserved for origin/destination).
 
 The Directions API is called again with these shelters injected as `stopover: false` waypoints, bending the route toward shelter coverage without creating mandatory stops. If the waypoint request fails, the app falls back to the direct route.
 
@@ -91,7 +92,7 @@ The sidebar displays: coverage score (0-100%), total distance and walk time, she
 1. Push to GitHub
 2. Import at [vercel.com/new](https://vercel.com/new) — no build settings needed
 3. Add environment variable: `GOOGLE_MAPS_API_KEY`
-4. Enable in Google Cloud Console: Maps JavaScript API, Directions API, Places API
+4. Enable in Google Cloud Console: Maps JavaScript API, Directions API, Distance Matrix API, Places API
 
 ### Local development
 
@@ -117,7 +118,7 @@ vercel dev
 
 - **Tel Aviv-Yafo only.** Shelter data comes exclusively from the Tel Aviv municipality GIS. Any portion of a route outside the city boundary has zero shelter coverage data.
 - **Public shelters only.** Private mamad rooms (ממ״ד) in residential buildings are not in the municipal dataset.
-- **Straight-line distance, not walking distance.** Coverage radius is measured as geodesic distance. A shelter 400 m away as the crow flies may be further on foot due to street layout and obstacles.
+- **Walking distance is approximate for coverage checks.** Coverage radius applies a 1.3× correction factor to convert straight-line distance to estimated walking distance. Shelter list walking times use the Google Distance Matrix API for actual walking distances where available.
 - **23-waypoint cap.** Google Directions limits requests to 25 waypoints (2 reserved for origin/destination). Very long routes with many gaps may not have all gaps addressed in a single routing call.
 - **Longer routes.** The shelter-aware route can be noticeably longer than the direct route, depending on shelter density in the area.
 - **No real-time status.** The `pail` (operational status) field reflects the municipality's records, not live conditions. Shelters may be temporarily closed for maintenance or locked outside emergencies.
