@@ -136,6 +136,19 @@
     input:focus { border-color: var(--blue); }
     input::placeholder { color: var(--muted); }
 
+    .loc-btn {
+      position: absolute; right: 4px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      padding: 4px 6px; z-index: 2;
+      color: var(--muted); font-size: 16px; line-height: 1;
+      transition: color 0.15s;
+      display: flex; align-items: center;
+    }
+    .loc-btn:hover { color: var(--blue); }
+    .loc-btn.active { color: var(--blue); }
+    .loc-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
     .radius-row {
       display: flex; align-items: center; gap: 8px;
       margin-top: 8px;
@@ -416,11 +429,17 @@
       <div class="lbl">Route</div>
       <div class="field">
         <div class="field-dot s"></div>
-        <input type="text" id="origin" placeholder="Start…"/>
+        <input type="text" id="origin" placeholder="Start…" style="padding-right:32px"/>
+        <button class="loc-btn" onclick="useMyLocation('origin')" title="Use my current location">
+          <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+        </button>
       </div>
       <div class="field">
         <div class="field-dot e"></div>
-        <input type="text" id="dest" placeholder="Destination…"/>
+        <input type="text" id="dest" placeholder="Destination…" style="padding-right:32px"/>
+        <button class="loc-btn" onclick="useMyLocation('dest')" title="Use my current location">
+          <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+        </button>
       </div>
 
       <div class="radius-row">
@@ -525,6 +544,54 @@ let map, dirSvc, dirRenderer;
 let mapsReady = false;
 let mapObjects = [];
 let shelterRatings = {};
+let geoLocations = { origin: null, dest: null };
+
+// ═══════════════════════════════════════════════════════
+//  USE MY LOCATION
+// ═══════════════════════════════════════════════════════
+function useMyLocation(fieldId) {
+  if (!navigator.geolocation) {
+    return setStatus('Geolocation is not supported by your browser.', 'err');
+  }
+  const input = document.getElementById(fieldId);
+  const btn = input.parentElement.querySelector('.loc-btn');
+  input.value = 'Locating…';
+  input.disabled = true;
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      geoLocations[fieldId] = { lat, lng };
+      input.value = 'My Location';
+      input.disabled = false;
+      btn.classList.add('active');
+    },
+    (err) => {
+      input.value = '';
+      input.disabled = false;
+      geoLocations[fieldId] = null;
+      btn.classList.remove('active');
+      const msgs = {
+        1: 'Location access denied. Please allow location access in your browser settings.',
+        2: 'Could not determine your location. Please try again.',
+        3: 'Location request timed out. Please try again.',
+      };
+      setStatus(msgs[err.code] || 'Could not get your location.', 'err');
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+// Clear geolocation when user types in the field
+document.addEventListener('DOMContentLoaded', () => {
+  ['origin', 'dest'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      geoLocations[id] = null;
+      document.getElementById(id).parentElement.querySelector('.loc-btn').classList.remove('active');
+    });
+  });
+});
 
 // ═══════════════════════════════════════════════════════
 //  MOBILE SIDEBAR TOGGLE
@@ -600,11 +667,11 @@ function initMap() {
 //  MAIN ENTRY
 // ═══════════════════════════════════════════════════════
 async function run() {
-  const orig = document.getElementById('origin').value.trim();
-  const dest = document.getElementById('dest').value.trim();
+  const origText = document.getElementById('origin').value.trim();
+  const destText = document.getElementById('dest').value.trim();
   const radius = parseInt(document.getElementById('radius').value);
 
-  if (!orig || !dest) return setStatus('Enter both a start and end point.', 'err');
+  if (!origText || !destText) return setStatus('Enter both a start and end point.', 'err');
 
   // On mobile, close sidebar so the map is visible while planning
   if (window.innerWidth <= 768) {
@@ -623,6 +690,13 @@ async function run() {
       await loadMaps(key);
       initMap();
     }
+
+    const orig = geoLocations.origin
+      ? new google.maps.LatLng(geoLocations.origin.lat, geoLocations.origin.lng)
+      : origText;
+    const dest = geoLocations.dest
+      ? new google.maps.LatLng(geoLocations.dest.lat, geoLocations.dest.lng)
+      : destText;
 
     clearAll();
     setStatus('Getting walking route…', 'info');
