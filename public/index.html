@@ -394,6 +394,26 @@
     .iw-review { font-size: 10px; color: #666; margin-bottom: 4px; line-height: 1.4; }
     .iw-review .iw-r-stars { color: var(--amber); font-size: 9px; }
 
+    /* ── LANGUAGE SELECTOR ── */
+    #langSel {
+      background: transparent; color: var(--paper); border: 1px solid rgba(244,239,230,0.25);
+      font-family: 'DM Mono', monospace; font-size: 11px; padding: 3px 6px;
+      cursor: pointer; border-radius: 2px; margin-left: 12px;
+    }
+    #langSel option { background: var(--ink); color: var(--paper); }
+
+    /* ── RTL (Hebrew) ── */
+    body.he { direction: rtl; }
+    body.he .sidebar { border-right: none; border-left: 1.5px solid var(--ink); }
+    body.he .field-dot { left: auto; right: 10px; }
+    body.he input[type=text], body.he input[type=password] { padding: 10px 28px 10px 10px; }
+    body.he input[type=text].plain, body.he input[type=password].plain { padding-right: 10px; }
+    body.he .s-addr, body.he .s-tags, body.he .s-rating, body.he .s-notes { padding-left: 0; padding-right: 28px; }
+    body.he .legend { right: auto; left: 20px; }
+    body.he .header-tag { margin-left: 0; margin-right: auto; }
+    body.he #langSel { margin-left: 0; margin-right: 12px; }
+    body.he .loc-btn { right: auto; left: 4px; }
+
     /* ── MOBILE TOGGLE BUTTON (legacy, hidden) ── */
     .mobile-toggle { display: none; }
 
@@ -525,7 +545,11 @@
     Miklat Route
     <span class="logo-he">מקלט</span>
   </div>
-  <div class="header-tag">Shelter-Safe Walking · Tel Aviv-Yafo</div>
+  <select id="langSel" onchange="setLang(this.value)">
+    <option value="en">EN</option>
+    <option value="he">עב</option>
+  </select>
+  <div class="header-tag" data-i18n="headerTag">Shelter-Safe Walking · Tel Aviv-Yafo</div>
 </header>
 
 <div class="app">
@@ -534,40 +558,40 @@
   <div class="sidebar">
     <div class="sidebar-scroll">
 
-      <div class="lbl">Route</div>
+      <div class="lbl" data-i18n="lblRoute">Route</div>
       <div class="field">
         <div class="field-dot s"></div>
-        <input type="text" id="origin" placeholder="Start…" style="padding-right:32px"/>
+        <input type="text" id="origin" data-i18n-placeholder="phStart" placeholder="Start…" style="padding-right:32px"/>
         <button class="loc-btn" onclick="useMyLocation('origin')" title="Use my current location">
           <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
         </button>
       </div>
       <div class="field">
         <div class="field-dot e"></div>
-        <input type="text" id="dest" placeholder="Destination…" style="padding-right:32px"/>
+        <input type="text" id="dest" data-i18n-placeholder="phDest" placeholder="Destination…" style="padding-right:32px"/>
         <button class="loc-btn" onclick="useMyLocation('dest')" title="Use my current location">
           <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
         </button>
       </div>
 
       <div class="radius-row">
-        <label>Max gap from miklat</label>
+        <label data-i18n="maxGap">Max gap from miklat</label>
         <select id="radius">
-          <option value="200">2 min (~200m)</option>
-          <option value="400" selected>5 min (~400m)</option>
-          <option value="600">7 min (~600m)</option>
+          <option value="200" data-i18n="rad200">2 min (~200m)</option>
+          <option value="400" selected data-i18n="rad400">5 min (~400m)</option>
+          <option value="600" data-i18n="rad600">7 min (~600m)</option>
         </select>
       </div>
 
       <div class="target-row">
-        <label>Coverage target</label>
+        <label data-i18n="coverageTarget">Coverage target</label>
         <input type="range" class="target-slider" id="coverageTarget" min="50" max="100" step="5" value="80"/>
         <span class="target-val" id="coverageTargetVal">80%</span>
       </div>
-      <div class="target-hint">Higher targets may produce longer, more circuitous routes.</div>
+      <div class="target-hint" data-i18n="targetHint">Higher targets may produce longer, more circuitous routes.</div>
 
       <button class="btn" id="goBtn" onclick="run()">
-        <span class="bt">PLAN SAFE ROUTE</span>
+        <span class="bt" data-i18n="btnGo">PLAN SAFE ROUTE</span>
         <div class="sp"></div>
       </button>
 
@@ -578,12 +602,12 @@
         <div class="score-top">
           <div>
             <div class="score-pct" id="scorePct">—</div>
-            <div class="score-label" id="scoreLabel">Route coverage</div>
+            <div class="score-label" id="scoreLabel" data-i18n="routeCoverage">Route coverage</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:10px;color:var(--muted)">Route length</div>
+            <div style="font-size:10px;color:var(--muted)" data-i18n="routeLength">Route length</div>
             <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px" id="routeDist">—</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:4px">Walk time</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:4px" data-i18n="walkTime">Walk time</div>
             <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px" id="routeTime">—</div>
           </div>
         </div>
@@ -593,36 +617,36 @@
         <div class="score-meta">
           <div class="smeta">
             <div class="smeta-v" id="metaShelters">0</div>
-            <div class="smeta-l">Miklatim</div>
+            <div class="smeta-l" data-i18n="miklatim">Miklatim</div>
           </div>
           <div class="smeta">
             <div class="smeta-v" id="metaGaps" style="color:var(--red)">0</div>
-            <div class="smeta-l">Gap segments</div>
+            <div class="smeta-l" data-i18n="gapSegments">Gap segments</div>
           </div>
           <div class="smeta">
             <div class="smeta-v" id="metaGapDist">—</div>
-            <div class="smeta-l">Exposed dist.</div>
+            <div class="smeta-l" data-i18n="exposedDist">Exposed dist.</div>
           </div>
         </div>
       </div>
 
       <!-- DRAG HINT -->
       <div class="drag-hint" id="dragHint">
-        ✋ Drag the route on the map to adjust it manually. Coverage will update in real time.
+        <span data-i18n="dragHint">✋ Drag the route on the map to adjust it manually. Coverage will update in real time.</span>
       </div>
 
       <!-- GAP WARNINGS -->
       <div id="gapSection" style="display:none">
-        <div class="section-head">⚠ Coverage gaps</div>
+        <div class="section-head" data-i18n="coverageGaps">⚠ Coverage gaps</div>
         <div id="gapList"></div>
       </div>
 
       <!-- SHELTER LIST -->
       <div id="shelterSection" style="display:none">
-        <div class="section-head">Miklatim on route</div>
+        <div class="section-head" data-i18n="miklatimOnRoute">Miklatim on route</div>
         <div id="shelterList"></div>
         <div class="disc">
-          <strong>⚠ Safety notice:</strong> Shelter data from Tel Aviv-Yafo Municipality GIS. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (פיקוד העורף) guidance in emergencies.
+          <strong data-i18n="safetyNoticeLabel">⚠ Safety notice:</strong> <span data-i18n="safetyNoticeText">Shelter data from Tel Aviv-Yafo Municipality GIS. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (פיקוד העורף) guidance in emergencies.</span>
         </div>
         <div class="data-src">
           Data: <a href="https://gisn.tel-aviv.gov.il" target="_blank">עיריית תל אביב-יפו — GIS</a> · Layer 592
@@ -631,7 +655,7 @@
 
       <div class="empty" id="emptyState">
         <div class="empty-icon">🗺️</div>
-        <div class="empty-txt">Enter a start and end point in Tel Aviv.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.</div>
+        <div class="empty-txt" data-i18n="emptyText">Enter a start and end point in Tel Aviv.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.</div>
       </div>
 
     </div>
@@ -653,11 +677,11 @@
         <div class="mobile-search-inputs">
           <div class="mobile-search-row">
             <div class="field-dot s"></div>
-            <input type="text" id="mobileOrigin" placeholder="Start…"/>
+            <input type="text" id="mobileOrigin" data-i18n-placeholder="phStart" placeholder="Start…"/>
           </div>
           <div class="mobile-search-row">
             <div class="field-dot e"></div>
-            <input type="text" id="mobileDest" placeholder="Destination…"/>
+            <input type="text" id="mobileDest" data-i18n-placeholder="phDest" placeholder="Destination…"/>
           </div>
         </div>
         <div class="mobile-search-actions">
@@ -667,7 +691,7 @@
             <option value="600">~600m</option>
           </select>
           <button class="btn" id="mobileGoBtn" onclick="run()">
-            <span class="bt">PLAN ROUTE</span>
+            <span class="bt" data-i18n="btnGoMobile">PLAN ROUTE</span>
             <div class="sp"></div>
           </button>
         </div>
@@ -690,24 +714,167 @@
 
     <div id="map"></div>
     <div class="legend" id="legend">
-      <div class="legend-title">Legend</div>
-      <div class="leg-row"><div class="leg-dot" style="background:var(--green);border:1.5px solid var(--ink)"></div> Start point</div>
-      <div class="leg-row"><div class="leg-dot" style="background:var(--red);border:1.5px solid var(--ink)"></div> End point</div>
-      <div class="leg-row"><div class="leg-dot" style="background:var(--blue);border:1.5px solid var(--ink)"></div> Miklat (מקלט)</div>
-      <div class="leg-row"><div class="leg-line" style="background:var(--ink)"></div> Safe route</div>
-      <div class="leg-row"><div class="leg-line" style="background:var(--red)"></div> Coverage gap</div>
+      <div class="legend-title" data-i18n="legend">Legend</div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--green);border:1.5px solid var(--ink)"></div> <span data-i18n="legStart">Start point</span></div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--red);border:1.5px solid var(--ink)"></div> <span data-i18n="legEnd">End point</span></div>
+      <div class="leg-row"><div class="leg-dot" style="background:var(--blue);border:1.5px solid var(--ink)"></div> <span data-i18n="legMiklat">Miklat (מקלט)</span></div>
+      <div class="leg-row"><div class="leg-line" style="background:var(--ink)"></div> <span data-i18n="legSafe">Safe route</span></div>
+      <div class="leg-row"><div class="leg-line" style="background:var(--red)"></div> <span data-i18n="legGap">Coverage gap</span></div>
       <div class="leg-row">
         <div style="width:22px;height:14px;border-radius:7px;background:var(--safe-fill);border:1.5px solid var(--safe-stroke);flex-shrink:0"></div>
-        Shelter radius
+        <span data-i18n="legRadius">Shelter radius</span>
       </div>
       <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:9px;color:var(--muted)">
-        ✋ Drag route to adjust
+        <span data-i18n="legDrag">✋ Drag route to adjust</span>
       </div>
     </div>
   </div>
 </div>
 
 <script>
+// ═══════════════════════════════════════════════════════
+//  I18N
+// ═══════════════════════════════════════════════════════
+const STRINGS = {
+  en: {
+    headerTag: 'Shelter-Safe Walking · Tel Aviv-Yafo',
+    lblRoute: 'Route',
+    phStart: 'Start…',
+    phDest: 'Destination…',
+    maxGap: 'Max gap from miklat',
+    rad200: '2 min (~200m)',
+    rad400: '5 min (~400m)',
+    rad600: '7 min (~600m)',
+    coverageTarget: 'Coverage target',
+    targetHint: 'Higher targets may produce longer, more circuitous routes.',
+    btnGo: 'PLAN SAFE ROUTE',
+    btnGoMobile: 'PLAN ROUTE',
+    routeCoverage: 'Route coverage',
+    routeLength: 'Route length',
+    walkTime: 'Walk time',
+    miklatim: 'Miklatim',
+    gapSegments: 'Gap segments',
+    exposedDist: 'Exposed dist.',
+    dragHint: '✋ Drag the route on the map to adjust it manually. Coverage will update in real time.',
+    coverageGaps: '⚠ Coverage gaps',
+    miklatimOnRoute: 'Miklatim on route',
+    safetyNoticeLabel: '⚠ Safety notice:',
+    safetyNoticeText: 'Shelter data from Tel Aviv-Yafo Municipality GIS. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (פיקוד העורף) guidance in emergencies.',
+    emptyText: 'Enter a start and end point in Tel Aviv.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.',
+    legend: 'Legend',
+    legStart: 'Start point',
+    legEnd: 'End point',
+    legMiklat: 'Miklat (מקלט)',
+    legSafe: 'Safe route',
+    legGap: 'Coverage gap',
+    legRadius: 'Shelter radius',
+    legDrag: '✋ Drag route to adjust',
+    statusEnterBoth: 'Enter both a start and end point.',
+    statusLoadingConfig: 'Loading configuration…',
+    statusConfigErr: 'Could not load API config. Is GOOGLE_MAPS_API_KEY set in Vercel?',
+    statusLoadingMaps: 'Loading Google Maps…',
+    statusGettingRoute: 'Getting walking route…',
+    statusFetchingShelters: 'Fetching מקלטים from Tel Aviv Municipality…',
+    statusFoundShelters: (n, tgt) => `Found ${n} miklatim. Optimising for ${tgt}% coverage…`,
+    statusRoutingWaypoints: (iter, n) => `Iteration ${iter}: routing through ${n} shelter waypoints…`,
+    statusBestAchievable: (pct, tgt) => `Best achievable: ${pct}% (target: ${tgt}%). Drag the route to improve.`,
+    statusCalcWalk: 'Calculating walking distances…',
+    statusFullCoverage: '✓ Fully covered route',
+    statusMeetsTarget: (pct, tgt) => `✓ ${pct}% coverage meets your ${tgt}% target`,
+    statusPartialCoverage: (pct) => `${pct}% of route within shelter radius`,
+    gapLabel: (i, dist, min) => `<strong>Gap ${i}</strong> — ${dist}m with no shelter within radius (~${min} min exposed)`,
+    rateThisShelter: 'Rate this shelter',
+    submitBtn: 'Submit',
+    phReview: 'Optional review (max 500 chars)',
+    routeWaypoint: '★ Route waypoint',
+    thankYou: 'Thanks!',
+    errorRetry: 'Error — retry',
+    geoNotSupported: 'Geolocation is not supported by your browser.',
+    locating: 'Locating…',
+    myLocation: 'My Location',
+  },
+  he: {
+    headerTag: 'הליכה מוגנת · תל אביב-יפו',
+    lblRoute: 'מסלול',
+    phStart: 'נקודת התחלה…',
+    phDest: 'יעד…',
+    maxGap: 'מרחק מרבי ממקלט',
+    rad200: '2 דק׳ (~200 מ׳)',
+    rad400: '5 דק׳ (~400 מ׳)',
+    rad600: '7 דק׳ (~600 מ׳)',
+    coverageTarget: 'יעד כיסוי',
+    targetHint: 'יעדים גבוהים עשויים לייצר מסלולים ארוכים ומפותלים יותר.',
+    btnGo: 'תכנן מסלול מוגן',
+    btnGoMobile: 'תכנן מסלול',
+    routeCoverage: 'כיסוי מסלול',
+    routeLength: 'אורך מסלול',
+    walkTime: 'זמן הליכה',
+    miklatim: 'מקלטים',
+    gapSegments: 'קטעים חשופים',
+    exposedDist: 'מרחק חשוף',
+    dragHint: '✋ גררו את המסלול במפה כדי להתאים ידנית. הכיסוי יתעדכן בזמן אמת.',
+    coverageGaps: '⚠ פערי כיסוי',
+    miklatimOnRoute: 'מקלטים במסלול',
+    safetyNoticeLabel: '⚠ שימו לב:',
+    safetyNoticeText: 'נתוני המקלטים מ-GIS עיריית תל אביב-יפו. הכיסוי עשוי להיות חלקי או לא עדכני. תמיד ודאו את מיקום המקלטים בשטח ופעלו לפי הנחיות פיקוד העורף בחירום.',
+    emptyText: 'הזינו נקודת התחלה ויעד בתל אביב.<br/>האפליקציה תמצא מסלול הליכה שישמור אתכם בטווח מקלט בכל רגע.',
+    legend: 'מקרא',
+    legStart: 'נקודת התחלה',
+    legEnd: 'נקודת סיום',
+    legMiklat: 'מקלט',
+    legSafe: 'מסלול מוגן',
+    legGap: 'פער כיסוי',
+    legRadius: 'רדיוס מקלט',
+    legDrag: '✋ גררו מסלול להתאמה',
+    statusEnterBoth: 'הזינו נקודת התחלה ויעד.',
+    statusLoadingConfig: 'טוען הגדרות…',
+    statusConfigErr: 'לא ניתן לטעון הגדרות API. האם GOOGLE_MAPS_API_KEY מוגדר?',
+    statusLoadingMaps: 'טוען מפות גוגל…',
+    statusGettingRoute: 'מחשב מסלול הליכה…',
+    statusFetchingShelters: 'מאתר מקלטים מעיריית תל אביב…',
+    statusFoundShelters: (n, tgt) => `נמצאו ${n} מקלטים. מייעל לכיסוי ${tgt}%…`,
+    statusRoutingWaypoints: (iter, n) => `איטרציה ${iter}: מתווה מסלול דרך ${n} מקלטים…`,
+    statusBestAchievable: (pct, tgt) => `מיטבי אפשרי: ${pct}% (יעד: ${tgt}%). גררו את המסלול לשיפור.`,
+    statusCalcWalk: 'מחשב מרחקי הליכה…',
+    statusFullCoverage: '✓ מסלול מכוסה לחלוטין',
+    statusMeetsTarget: (pct, tgt) => `✓ כיסוי ${pct}% עומד ביעד ${tgt}%`,
+    statusPartialCoverage: (pct) => `${pct}% מהמסלול בטווח מקלט`,
+    gapLabel: (i, dist, min) => `<strong>פער ${i}</strong> — ${dist} מ׳ ללא מקלט בטווח (~${min} דק׳ חשופות)`,
+    rateThisShelter: 'דרגו מקלט זה',
+    submitBtn: 'שלח',
+    phReview: 'ביקורת אופציונלית (עד 500 תווים)',
+    routeWaypoint: '★ תחנת מסלול',
+    thankYou: '!תודה',
+    errorRetry: 'שגיאה — נסו שוב',
+    geoNotSupported: 'הדפדפן שלך אינו תומך במיקום.',
+    locating: 'מאתר…',
+    myLocation: 'המיקום שלי',
+  }
+};
+
+let currentLang = 'en';
+
+function t(key) {
+  return STRINGS[currentLang][key] || STRINGS.en[key] || key;
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById('langSel').value = lang;
+  document.documentElement.lang = lang;
+  document.body.classList.toggle('he', lang === 'he');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const val = t(el.dataset.i18n);
+    if (typeof val === 'string') el.innerHTML = val;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const val = t(el.dataset.i18nPlaceholder);
+    if (typeof val === 'string') el.placeholder = val;
+  });
+  localStorage.setItem('miklat-lang', lang);
+  mapsReady = false;
+}
+
 // ═══════════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════════
@@ -726,11 +893,11 @@ let shelterListUpdateTimer = null;
 // ═══════════════════════════════════════════════════════
 function useMyLocation(fieldId) {
   if (!navigator.geolocation) {
-    return setStatus('Geolocation is not supported by your browser.', 'err');
+    return setStatus(t('geoNotSupported'), 'err');
   }
   const input = document.getElementById(fieldId);
   const btn = input.parentElement.querySelector('.loc-btn');
-  input.value = 'Locating…';
+  input.value = t('locating');
   input.disabled = true;
 
   navigator.geolocation.getCurrentPosition(
@@ -738,7 +905,7 @@ function useMyLocation(fieldId) {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       geoLocations[fieldId] = { lat, lng };
-      input.value = 'My Location';
+      input.value = t('myLocation');
       input.disabled = false;
       btn.classList.add('active');
     },
@@ -995,7 +1162,8 @@ function loadMaps(key) {
     window.__mapsLoaded = () => { mapsReady = true; res(); };
     const s = document.createElement('script');
     s.id = '_gms';
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places,geometry&callback=__mapsLoaded&language=iw`;
+    const mapsLang = currentLang === 'he' ? 'iw' : 'en';
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places,geometry&callback=__mapsLoaded&language=${mapsLang}`;
     s.onerror = () => rej(new Error('Failed to load Google Maps — check your API key and that Maps JS API + Directions API are enabled.'));
     document.head.appendChild(s);
   });
@@ -1053,8 +1221,8 @@ async function run() {
   const coverageTarget = parseInt(document.getElementById('coverageTarget').value);
 
   if (!origText || !destText) {
-    setStatus('Enter both a start and end point.', 'err');
-    if (isMobile()) setMobileStatus('Enter both a start and end point.', 'err');
+    setStatus(t('statusEnterBoth'), 'err');
+    if (isMobile()) setMobileStatus(t('statusEnterBoth'), 'err');
     return;
   }
 
@@ -1067,11 +1235,11 @@ async function run() {
   setBusy(true);
   try {
     if (!mapsReady) {
-      setStatus('Loading configuration…', 'info');
+      setStatus(t('statusLoadingConfig'), 'info');
       const res = await fetch('/api/config');
-      if (!res.ok) throw new Error('Could not load API config. Is GOOGLE_MAPS_API_KEY set in Vercel?');
+      if (!res.ok) throw new Error(t('statusConfigErr'));
       const { key } = await res.json();
-      setStatus('Loading Google Maps…', 'info');
+      setStatus(t('statusLoadingMaps'), 'info');
       await loadMaps(key);
       initMap();
     }
@@ -1084,17 +1252,17 @@ async function run() {
       : destText;
 
     clearAll();
-    setStatus('Getting walking route…', 'info');
+    setStatus(t('statusGettingRoute'), 'info');
 
     // 1. Direct route
     const directRoute = await getRoute(orig, dest);
     if (!directRoute) return;
 
     // 2. Fetch shelters from Tel Aviv Municipality GIS
-    setStatus('Fetching מקלטים from Tel Aviv Municipality…', 'info');
+    setStatus(t('statusFetchingShelters'), 'info');
     const bbox = getPathBbox(directRoute.path, 0.012);
     const shelters = await fetchTLVShelters(bbox);
-    setStatus(`Found ${shelters.length} miklatim. Optimising for ${coverageTarget}% coverage…`, 'info');
+    setStatus(t('statusFoundShelters')(shelters.length, coverageTarget), 'info');
 
     // 3. Build shelter-aware route with coverage target
     const { waypointRoute, usedShelters } = await buildShelterRoute(
@@ -1118,7 +1286,7 @@ async function run() {
 
     // 7. UI
     renderScore(coveredPct, gaps, finalRoute, shelters.length, coverageTarget);
-    setStatus('Calculating walking distances…', 'info');
+    setStatus(t('statusCalcWalk'), 'info');
     const nearby = await renderShelterList(shelters, finalRoute.path, radius);
     renderGaps(gaps);
     fetchAndDisplayRatings((nearby || []).map(s => s.id));
@@ -1128,8 +1296,8 @@ async function run() {
     document.getElementById('dragHint').classList.add('show');
 
     const pctLabel = coveredPct >= coverageTarget
-      ? (coveredPct >= 99 ? '✓ Fully covered route' : `✓ ${coveredPct}% coverage meets your ${coverageTarget}% target`)
-      : `${coveredPct}% coverage (target: ${coverageTarget}%) — drag the route to improve`;
+      ? (coveredPct >= 99 ? t('statusFullCoverage') : t('statusMeetsTarget')(coveredPct, coverageTarget))
+      : t('statusPartialCoverage')(coveredPct);
     setStatus(pctLabel, coveredPct >= coverageTarget ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
 
     // On mobile, populate the bottom sheet and show it in peek mode
@@ -1327,7 +1495,7 @@ async function buildShelterRoute(orig, dest, directRoute, shelters, radius, cove
 
     if (!added) break;
 
-    setStatus(`Iteration ${iteration + 1}: routing through ${selectedShelters.length} shelter waypoints…`, 'info');
+    setStatus(t('statusRoutingWaypoints')(iteration + 1, selectedShelters.length), 'info');
 
     try {
       const waypoints = selectedShelters.map(s => new google.maps.LatLng(s.lat, s.lon));
@@ -1360,7 +1528,7 @@ async function buildShelterRoute(orig, dest, directRoute, shelters, radius, cove
   // If we still haven't met the target, return the best we found
   if (bestRoute) {
     if (bestPct < coverageTarget) {
-      setStatus(`Best achievable: ${bestPct}% (target: ${coverageTarget}%). Drag the route to improve.`, 'info');
+      setStatus(t('statusBestAchievable')(bestPct, coverageTarget), 'info');
     }
     return { waypointRoute: bestRoute, usedShelters: bestShelters, achievedPct: bestPct };
   }
@@ -1529,8 +1697,8 @@ function reanalyseDraggedRoute(draggedRoute, shelters, radius) {
   renderGaps(gaps);
 
   const pctLabel = coveredPct >= coverageTarget
-    ? (coveredPct >= 99 ? '✓ Fully covered route' : `✓ ${coveredPct}% coverage meets your ${coverageTarget}% target`)
-    : `${coveredPct}% coverage (target: ${coverageTarget}%) — keep dragging to improve`;
+    ? (coveredPct >= 99 ? t('statusFullCoverage') : t('statusMeetsTarget')(coveredPct, coverageTarget))
+    : t('statusPartialCoverage')(coveredPct);
   setStatus(pctLabel, coveredPct >= coverageTarget ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
 
   // Debounced shelter list update (async — avoid hammering Distance Matrix on each drag)
@@ -1619,19 +1787,19 @@ function drawShelterMarkers(shelters, usedShelters) {
       content: `<div style="font-family:'DM Mono',monospace;font-size:12px;padding:2px 4px;max-width:280px">
         <b style="font-family:'Syne',sans-serif;font-size:13px">${s.type || s.name}</b>
         ${s.addr ? `<br><span style="color:#888">${s.addr}</span>` : ''}
-        <br><span style="color:#1A4DE8;font-size:11px">${isWaypoint ? '★ Route waypoint' : 'מקלט #' + (s.ms_miklat || '')}</span>
+        <br><span style="color:#1A4DE8;font-size:11px">${isWaypoint ? t('routeWaypoint') : 'מקלט #' + (s.ms_miklat || '')}</span>
         ${areaStr}${filtStr}
         <br>${statusBadge} ${accessBadge}
         ${notesStr}
         <div class="iw-rating-line" data-shelter="${s.id}" style="margin-top:6px;font-size:11px"></div>
         <div class="iw-reviews" data-shelter="${s.id}"></div>
         <div class="review-form" style="margin-top:8px;padding-top:6px;border-top:1px solid #eee">
-          <div style="font-size:10px;color:#888;margin-bottom:2px">Rate this shelter</div>
+          <div style="font-size:10px;color:#888;margin-bottom:2px">${t('rateThisShelter')}</div>
           <div class="star-input" data-shelter="${s.id}" style="direction:ltr">
             <span data-v="1">☆</span><span data-v="2">☆</span><span data-v="3">☆</span><span data-v="4">☆</span><span data-v="5">☆</span>
           </div>
-          <textarea placeholder="Optional review (max 500 chars)" maxlength="500"></textarea>
-          <button onclick="submitReview('${s.id}', this)">Submit</button>
+          <textarea placeholder="${t('phReview')}" maxlength="500"></textarea>
+          <button onclick="submitReview('${s.id}', this)">${t('submitBtn')}</button>
         </div>
         <div style="margin-top:4px;color:#aaa;font-size:9px">עיריית תל אביב-יפו</div>
       </div>`
@@ -1759,7 +1927,7 @@ function renderGaps(gaps) {
     const walkMin = Math.ceil(walkSec / 60);
     const div = document.createElement('div');
     div.className = 'gap-card';
-    div.innerHTML = `<strong>Gap ${i+1}</strong> — ${g.distMeters}m with no shelter within radius (~${walkMin} min exposed)`;
+    div.innerHTML = t('gapLabel')(i+1, g.distMeters, walkMin);
     div.addEventListener('click', () => {
       const mid = g.points[Math.floor(g.points.length/2)];
       map.panTo(mid); map.setZoom(16);
@@ -2014,11 +2182,11 @@ async function submitReview(shelterId, btn) {
     const el = document.querySelector(`.s-rating[data-shelter="${shelterId}"]`);
     if (el) el.innerHTML = `<span class="s-stars">${renderStars(c.avg)}</span> ${c.avg} (${c.count})`;
     // Update info window display
-    btn.textContent = 'Thanks!';
+    btn.textContent = t('thankYou');
     if (textarea) textarea.value = '';
     form.querySelectorAll('.star-input span').forEach(s => s.classList.remove('active'));
   } catch(e) {
-    btn.textContent = 'Error — retry';
+    btn.textContent = t('errorRetry');
     btn.disabled = false;
   }
 }
@@ -2050,6 +2218,9 @@ window.addEventListener('resize', () => {
     setSheetPosition(sheetState);
   }
 });
+
+// Init language from saved preference
+setLang(localStorage.getItem('miklat-lang') || 'en');
 </script>
 </body>
 </html>
