@@ -81,7 +81,7 @@
 
     /* ── SIDEBAR ── */
     .sidebar {
-      width: 320px;
+      width: 340px;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
@@ -251,6 +251,20 @@
     .s-name { font-size: 11.5px; font-weight: 500; flex: 1; line-height: 1.4; }
     .s-dist { font-size: 10.5px; color: var(--blue); font-weight: 500; flex-shrink: 0; }
     .s-addr { font-size: 10px; color: var(--muted); margin-top: 3px; padding-left: 28px; }
+    .s-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; padding-left: 28px; }
+    .s-tag {
+      font-size: 9px; padding: 2px 6px;
+      border-radius: 2px; background: var(--paper2);
+      color: var(--muted); white-space: nowrap;
+    }
+    .s-tag.accessible { background: #e8f5e9; color: #2e7d32; }
+    .s-tag.filtered { background: #e3f2fd; color: #1565c0; }
+    .s-tag.status-ok { background: #e8f5e9; color: #2e7d32; }
+    .s-tag.status-bad { background: var(--red-dim); color: var(--red); }
+    .s-notes {
+      font-size: 10px; color: #666; margin-top: 5px; padding-left: 28px;
+      line-height: 1.5; direction: rtl; text-align: right;
+    }
 
     /* ── GAP WARNINGS ── */
     .gap-card {
@@ -258,6 +272,7 @@
       border: 1.5px solid rgba(217,59,34,0.4);
       border-radius: 2px; padding: 9px 11px;
       margin-bottom: 6px; font-size: 11px;
+      cursor: pointer;
     }
     .gap-card strong { color: var(--red); font-family: 'Syne', sans-serif; }
 
@@ -302,6 +317,13 @@
     /* ── MAP ── */
     .map-wrap { flex: 1; position: relative; min-width: 0; min-height: 0; }
     #map { width: 100%; height: 100%; display: block; }
+
+    /* ── DATA SOURCE BADGE ── */
+    .data-src {
+      font-size: 9px; color: var(--muted); margin-top: 6px;
+      letter-spacing: 0.05em;
+    }
+    .data-src a { color: var(--blue); text-decoration: none; }
   </style>
 </head>
 <body>
@@ -312,7 +334,7 @@
     Miklat Route
     <span class="logo-he">מקלט</span>
   </div>
-  <div class="header-tag">Shelter-Safe Walking Planner · Israel</div>
+  <div class="header-tag">Shelter-Safe Walking · Tel Aviv-Yafo</div>
 </header>
 
 <div class="app">
@@ -391,13 +413,16 @@
         <div class="section-head">Miklatim on route</div>
         <div id="shelterList"></div>
         <div class="disc">
-          <strong>⚠ Safety notice:</strong> Data from OpenStreetMap & Google Places. Coverage may be incomplete. Always verify shelter locations locally. Do not rely solely on this app in an emergency.
+          <strong>⚠ Safety notice:</strong> Shelter data from Tel Aviv-Yafo Municipality GIS. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (פיקוד העורף) guidance in emergencies.
+        </div>
+        <div class="data-src">
+          Data: <a href="https://gisn.tel-aviv.gov.il" target="_blank">עיריית תל אביב-יפו — GIS</a> · Layer 592
         </div>
       </div>
 
       <div class="empty" id="emptyState">
         <div class="empty-icon">🗺️</div>
-        <div class="empty-txt">Enter a start and end point.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.</div>
+        <div class="empty-txt">Enter a start and end point in Tel Aviv.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.</div>
       </div>
 
     </div>
@@ -425,9 +450,12 @@
 // ═══════════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════════
-let map, dirSvc, dirRenderer, placesSvc;
+let map, dirSvc, dirRenderer;
 let mapsReady = false;
-let mapObjects = []; // circles, polylines, markers to clear
+let mapObjects = [];
+
+// Tel Aviv Municipality ArcGIS endpoint for shelter layer 592
+const TLV_GIS_BASE = 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/WM/IView2WM/MapServer/592/query';
 
 // ═══════════════════════════════════════════════════════
 //  MAPS LOADER
@@ -440,7 +468,7 @@ function loadMaps(key) {
     const s = document.createElement('script');
     s.id = '_gms';
     s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places,geometry&callback=__mapsLoaded&language=iw`;
-    s.onerror = () => rej(new Error('Failed to load Google Maps — check your API key and that Maps JS API + Places API + Directions API are enabled.'));
+    s.onerror = () => rej(new Error('Failed to load Google Maps — check your API key and that Maps JS API + Directions API are enabled.'));
     document.head.appendChild(s);
   });
 }
@@ -467,10 +495,9 @@ function initMap() {
   dirRenderer = new google.maps.DirectionsRenderer({
     suppressMarkers: true,
     preserveViewport: true,
-    polylineOptions: { strokeOpacity: 0 }, // we draw our own coloured polyline
+    polylineOptions: { strokeOpacity: 0 },
   });
   dirRenderer.setMap(map);
-  placesSvc = new google.maps.places.PlacesService(map);
 
   // Autocomplete restricted to IL
   ['origin','dest'].forEach(id => {
@@ -507,17 +534,17 @@ async function run() {
     clearAll();
     setStatus('Getting walking route…', 'info');
 
-    // 1. Direct route (to understand the corridor)
+    // 1. Direct route
     const directRoute = await getRoute(orig, dest);
     if (!directRoute) return;
 
-    // 2. Fetch all shelters in the bounding box + buffer
-    setStatus('Fetching מקלטים from OpenStreetMap…', 'info');
-    const bbox = getPathBbox(directRoute.path, 0.012); // ~1.2km buffer
-    const shelters = await fetchAllShelters(bbox);
+    // 2. Fetch shelters from Tel Aviv Municipality GIS
+    setStatus('Fetching מקלטים from Tel Aviv Municipality…', 'info');
+    const bbox = getPathBbox(directRoute.path, 0.012);
+    const shelters = await fetchTLVShelters(bbox);
     setStatus(`Found ${shelters.length} miklatim. Analysing coverage…`, 'info');
 
-    // 3. Build shelter-aware route using waypoints
+    // 3. Build shelter-aware route
     const { waypointRoute, usedShelters } = await buildShelterRoute(
       orig, dest, directRoute, shelters, radius
     );
@@ -527,7 +554,7 @@ async function run() {
     const { coveredPct, gaps, coveredPolyline, gapPolylines } =
       analyseRouteCoverage(finalRoute.path, shelters, radius);
 
-    // 5. Draw everything
+    // 5. Draw
     drawRoute(coveredPolyline, gapPolylines);
     drawShelterCircles(shelters, radius);
     drawShelterMarkers(shelters, usedShelters);
@@ -555,7 +582,7 @@ async function run() {
 }
 
 // ═══════════════════════════════════════════════════════
-//  STEP 1: GET DIRECT ROUTE
+//  STEP 1: GET ROUTE
 // ═══════════════════════════════════════════════════════
 function getRoute(origin, destination, waypoints) {
   return new Promise((res) => {
@@ -575,7 +602,6 @@ function getRoute(origin, destination, waypoints) {
       }
       const leg0 = result.routes[0].legs[0];
       const lastLeg = result.routes[0].legs[result.routes[0].legs.length - 1];
-      // Merge all leg steps into one polyline
       let allPoints = [];
       for (const leg of result.routes[0].legs) {
         for (const step of leg.steps) {
@@ -598,109 +624,87 @@ function getRoute(origin, destination, waypoints) {
 }
 
 // ═══════════════════════════════════════════════════════
-//  STEP 2: FETCH ALL SHELTERS (OSM + Google Places)
+//  STEP 2: FETCH SHELTERS — Tel Aviv Municipality GIS
+//  ArcGIS REST API, layer 592, spatial query with
+//  route bounding box envelope in EPSG:4326 (outSR=4326)
 // ═══════════════════════════════════════════════════════
-async function fetchAllShelters(bbox) {
-  const foundIds = new Set();
+async function fetchTLVShelters(bbox) {
   const shelters = [];
 
-  // ── OSM Overpass ──
   try {
-    const { south, west, north, east } = bbox;
-    const q = `[out:json][timeout:15];
-(
-  node["amenity"="shelter"](${south},${west},${north},${east});
-  node["shelter_type"="public"](${south},${west},${north},${east});
-  node["building"="bunker"](${south},${west},${north},${east});
-  node["name"~"מקלט",i](${south},${west},${north},${east});
-  node["name"~"miklat",i](${south},${west},${north},${east});
-  way["amenity"="shelter"](${south},${west},${north},${east});
-  way["name"~"מקלט",i](${south},${west},${north},${east});
-);
-out center body;`;
-    const r = await fetch('https://overpass-api.de/api/interpreter', { method:'POST', body:q });
-    const d = await r.json();
-    for (const el of (d.elements || [])) {
-      const lat = el.lat ?? el.center?.lat;
-      const lon = el.lon ?? el.center?.lon;
+    const params = new URLSearchParams({
+      where: '1=1',
+      geometry: `${bbox.west},${bbox.south},${bbox.east},${bbox.north}`,
+      geometryType: 'esriGeometryEnvelope',
+      inSR: '4326',
+      spatialRel: 'esriSpatialRelIntersects',
+      outFields: [
+        'oid_mitkan','ms_miklat','t_sug','Full_Address',
+        'shem_rechov_eng','shetach_mr','t_sinon','hearot',
+        'lon','lat','pail','opening_times','is_open',
+        'miklat_mungash','shem'
+      ].join(','),
+      outSR: '4326',
+      returnGeometry: 'true',
+      f: 'json',
+    });
+
+    const resp = await fetch(`${TLV_GIS_BASE}?${params}`);
+    const data = await resp.json();
+
+    if (data.error) {
+      console.warn('TLV GIS error:', data.error);
+      return shelters;
+    }
+
+    for (const feat of (data.features || [])) {
+      const a = feat.attributes;
+      const g = feat.geometry;
+      // Prefer lon/lat from attributes (more precise), fall back to geometry
+      const lat = a.lat || g.y;
+      const lon = a.lon || g.x;
       if (!lat || !lon) continue;
-      const id = `osm-${el.id}`;
-      if (foundIds.has(id)) continue;
-      foundIds.add(id);
+
       shelters.push({
-        id, lat, lon,
-        name: el.tags?.['name:he'] || el.tags?.name || 'מקלט ציבורי',
-        addr: el.tags?.['addr:street']
-          ? `${el.tags['addr:street']} ${el.tags['addr:housenumber']||''}`.trim()
-          : '',
-        source: 'osm',
+        id: `tlv-${a.oid_mitkan}`,
+        ms_miklat: a.ms_miklat,
+        lat, lon,
+        name: a.shem || a.t_sug || 'מקלט ציבורי',
+        type: a.t_sug || '',
+        addr: a.Full_Address || '',
+        addrEng: (a.shem_rechov_eng || '').trim(),
+        area: a.shetach_mr || 0,
+        filtration: a.t_sinon || '',
+        notes: a.hearot || '',
+        status: a.pail || '',
+        openingTimes: a.opening_times || '',
+        isOpen: a.is_open || '',
+        accessible: (a.miklat_mungash || '').trim(),
+        source: 'tlv-gis',
         location: new google.maps.LatLng(lat, lon),
       });
     }
-  } catch(e) { console.warn('OSM failed', e); }
-
-  // ── Google Places ──
-  const center = {
-    lat: (bbox.south + bbox.north) / 2,
-    lng: (bbox.west  + bbox.east)  / 2,
-  };
-  const radius = Math.max(
-    google.maps.geometry.spherical.computeDistanceBetween(
-      new google.maps.LatLng(bbox.south, bbox.west),
-      new google.maps.LatLng(bbox.north, bbox.east)
-    ) / 2, 500
-  );
-
-  const queries = ['מקלט', 'bomb shelter miklat'];
-  for (const kw of queries) {
-    const results = await placesNearby(center, Math.min(radius, 3000), kw);
-    for (const p of results) {
-      if (foundIds.has(p.place_id)) continue;
-      foundIds.add(p.place_id);
-      const ll = p.geometry.location;
-      shelters.push({
-        id: p.place_id,
-        lat: ll.lat(), lon: ll.lng(),
-        name: p.name,
-        addr: p.vicinity || '',
-        source: 'google',
-        location: ll,
-      });
-    }
+  } catch(e) {
+    console.warn('TLV GIS fetch failed', e);
   }
 
   return shelters;
 }
 
-function placesNearby(center, radius, keyword) {
-  return new Promise(res => {
-    placesSvc.nearbySearch({ location: center, radius, keyword },
-      (r, s) => res((s === 'OK' || s === 'ZERO_RESULTS') ? (r || []) : [])
-    );
-  });
-}
-
 // ═══════════════════════════════════════════════════════
 //  STEP 3: BUILD SHELTER-AWARE ROUTE
-//  Strategy: find gap segments in direct route, inject
-//  nearest shelter as waypoint to divert through coverage.
-//  Respect Google's 25-waypoint limit.
 // ═══════════════════════════════════════════════════════
 async function buildShelterRoute(orig, dest, directRoute, shelters, radius) {
   if (!shelters.length) return { waypointRoute: null, usedShelters: [] };
 
-  // Find points on the direct route that are NOT covered
   const gapPoints = directRoute.path.filter(p =>
     !isPointCovered(p, shelters, radius)
   );
 
   if (!gapPoints.length) {
-    // Direct route is already fully covered — no waypoints needed
     return { waypointRoute: directRoute, usedShelters: [] };
   }
 
-  // For each gap point, find the nearest shelter
-  // Cluster gap points and pick up to 23 unique shelter waypoints
   const waypointShelterSet = new Set();
   const waypointShelters = [];
 
@@ -734,16 +738,13 @@ async function buildShelterRoute(orig, dest, directRoute, shelters, radius) {
 }
 
 // ═══════════════════════════════════════════════════════
-//  STEP 4: ANALYSE COVERAGE — split path into
-//  covered (green/black) vs gap (red) segments
+//  STEP 4: ANALYSE COVERAGE
 // ═══════════════════════════════════════════════════════
 function analyseRouteCoverage(path, shelters, radius) {
   if (!path.length) return { coveredPct: 0, gaps: [], coveredPolyline: [], gapPolylines: [] };
 
-  // Tag each path point
   const tags = path.map(p => isPointCovered(p, shelters, radius));
 
-  // Split into runs of covered / gap
   const runs = [];
   let cur = { covered: tags[0], points: [path[0]] };
   for (let i = 1; i < path.length; i++) {
@@ -751,12 +752,11 @@ function analyseRouteCoverage(path, shelters, radius) {
       cur.points.push(path[i]);
     } else {
       runs.push(cur);
-      cur = { covered: tags[i], points: [path[i-1], path[i]] }; // overlap for continuity
+      cur = { covered: tags[i], points: [path[i-1], path[i]] };
     }
   }
   runs.push(cur);
 
-  // Measure distances
   let coveredDist = 0, gapDist = 0;
   const coveredSegs = [], gapSegs = [], gaps = [];
 
@@ -848,12 +848,27 @@ function drawShelterMarkers(shelters, usedShelters) {
       },
       zIndex: isWaypoint ? 12 : 8,
     });
+
+    // Build rich info window content
+    const accessBadge = s.accessible === 'כן'
+      ? '<span style="color:#2e7d32;font-size:10px">♿ נגיש</span>' : '';
+    const statusBadge = s.status
+      ? `<span style="color:${s.status === 'כשיר לשימוש' ? '#2e7d32' : '#D93B22'};font-size:10px">${s.status}</span>` : '';
+    const areaStr = s.area ? `<br><span style="color:#888;font-size:10px">${s.area} מ״ר</span>` : '';
+    const filtStr = s.filtration && s.filtration !== 'ללא מערכת סינון'
+      ? `<br><span style="color:#1565c0;font-size:10px">🛡 ${s.filtration}</span>` : '';
+    const notesStr = s.notes
+      ? `<div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee;font-size:10px;color:#666;direction:rtl;text-align:right;max-width:240px">${s.notes}</div>` : '';
+
     const iw = new google.maps.InfoWindow({
-      content: `<div style="font-family:'DM Mono',monospace;font-size:12px;padding:2px 4px;max-width:220px">
-        <b style="font-family:'Syne',sans-serif;font-size:13px">${s.name}</b><br>
-        ${s.addr ? `<span style="color:#888">${s.addr}</span><br>` : ''}
-        <span style="color:#1A4DE8;font-size:11px">${isWaypoint ? '★ Route waypoint' : 'Nearby shelter'}</span><br>
-        <span style="color:#aaa;font-size:10px">Source: ${s.source === 'osm' ? 'OpenStreetMap' : 'Google Places'}</span>
+      content: `<div style="font-family:'DM Mono',monospace;font-size:12px;padding:2px 4px;max-width:280px">
+        <b style="font-family:'Syne',sans-serif;font-size:13px">${s.type || s.name}</b>
+        ${s.addr ? `<br><span style="color:#888">${s.addr}</span>` : ''}
+        <br><span style="color:#1A4DE8;font-size:11px">${isWaypoint ? '★ Route waypoint' : 'מקלט #' + (s.ms_miklat || '')}</span>
+        ${areaStr}${filtStr}
+        <br>${statusBadge} ${accessBadge}
+        ${notesStr}
+        <div style="margin-top:4px;color:#aaa;font-size:9px">עיריית תל אביב-יפו</div>
       </div>`
     });
     marker.addListener('click', () => {
@@ -910,7 +925,6 @@ function renderScore(pct, gaps, route, shelterCount) {
   bar.style.width = `${pct}%`;
   bar.style.background = pct >= 99 ? '#18C96A' : pct >= 80 ? '#8BC34A' : pct >= 50 ? '#E8920F' : '#D93B22';
 
-  // Route totals
   const totalSec = route.totalDuration || 0;
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
@@ -956,7 +970,6 @@ function renderShelterList(shelters, path, radius) {
   sec.style.display = 'block';
   list.innerHTML = '';
 
-  // Only show shelters actually near the route
   const nearby = shelters
     .map(s => ({ ...s, routeDist: minDistToPath(s.location, path) }))
     .filter(s => s.routeDist <= radius * 1.5)
@@ -967,13 +980,34 @@ function renderShelterList(shelters, path, radius) {
     card.className = 's-card';
     card.id = `scard-${s._idx}`;
     const walkMin = Math.ceil(s.routeDist / 80);
+
+    // Build tags
+    let tagsHtml = '';
+    const tags = [];
+    if (s.type) tags.push(`<span class="s-tag">${s.type}</span>`);
+    if (s.accessible === 'כן') tags.push(`<span class="s-tag accessible">♿ נגיש</span>`);
+    if (s.filtration && s.filtration !== 'ללא מערכת סינון')
+      tags.push(`<span class="s-tag filtered">🛡 ${s.filtration}</span>`);
+    if (s.status === 'כשיר לשימוש')
+      tags.push(`<span class="s-tag status-ok">כשיר</span>`);
+    else if (s.status)
+      tags.push(`<span class="s-tag status-bad">${s.status}</span>`);
+    if (s.area) tags.push(`<span class="s-tag">${s.area} מ״ר</span>`);
+    if (tags.length) tagsHtml = `<div class="s-tags">${tags.join('')}</div>`;
+
+    // Notes (Hebrew entrance directions)
+    const notesHtml = s.notes
+      ? `<div class="s-notes">${s.notes}</div>` : '';
+
     card.innerHTML = `
       <div class="s-card-row">
         <div class="s-num">${i+1}</div>
-        <div class="s-name">${s.name}</div>
+        <div class="s-name">${s.addr || s.type || s.name}</div>
         <div class="s-dist">${walkMin}′</div>
       </div>
-      ${s.addr ? `<div class="s-addr">${s.addr}</div>` : ''}
+      ${s.addr && s.addrEng ? `<div class="s-addr">${s.addrEng}</div>` : ''}
+      ${tagsHtml}
+      ${notesHtml}
     `;
     card.addEventListener('click', () => {
       map.panTo(s.location); map.setZoom(17);
