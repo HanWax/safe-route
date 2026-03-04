@@ -717,13 +717,7 @@ let mapObjects = [];
 let shelterRatings = {};
 let geoLocations = { origin: null, dest: null };
 
-// State for draggable route re-analysis
-let lastShelters = [];
-let lastRadius = 400;
-let lastCoverageTarget = 80;
-let lastUsedShelters = [];
-let lastOrig = null;
-let lastDest = null;
+// State for draggable route
 let draggableRenderer = null;
 
 // ═══════════════════════════════════════════════════════
@@ -1125,18 +1119,10 @@ async function run() {
     drawEndpoints(finalRoute);
     fitAll(finalRoute, shelters);
 
-    // 6. Store state for drag-to-edit re-analysis
-    lastShelters = shelters;
-    lastRadius = radius;
-    lastCoverageTarget = coverageTarget;
-    lastUsedShelters = usedShelters;
-    lastOrig = orig;
-    lastDest = dest;
-
-    // 7. Set up draggable route
+    // 6. Set up draggable route
     setupDraggableRoute(finalRoute, shelters, radius);
 
-    // 8. UI
+    // 7. UI
     renderScore(coveredPct, gaps, finalRoute, shelters.length, coverageTarget);
     setStatus('Calculating walking distances…', 'info');
     const nearby = await renderShelterList(shelters, finalRoute.path, radius);
@@ -1148,10 +1134,8 @@ async function run() {
     document.getElementById('dragHint').classList.add('show');
 
     const pctLabel = coveredPct >= coverageTarget
-      ? `✓ ${coveredPct}% coverage meets your ${coverageTarget}% target`
-      : coveredPct >= 99
-        ? '✓ Fully covered route'
-        : `${coveredPct}% coverage (target: ${coverageTarget}%) — drag the route to improve`;
+      ? (coveredPct >= 99 ? '✓ Fully covered route' : `✓ ${coveredPct}% coverage meets your ${coverageTarget}% target`)
+      : `${coveredPct}% coverage (target: ${coverageTarget}%) — drag the route to improve`;
     setStatus(pctLabel, coveredPct >= coverageTarget ? 'ok' : coveredPct >= 70 ? 'info' : 'err');
 
     // On mobile, populate the bottom sheet and show it in peek mode
@@ -1299,17 +1283,7 @@ async function buildShelterRoute(orig, dest, directRoute, shelters, radius, cove
     return { waypointRoute: directRoute, usedShelters: [], achievedPct: 100 };
   }
 
-  // Score each shelter by how many gap points it would cover
   const effectiveRadius = radius / WALK_FACTOR;
-  const shelterGapCoverage = shelters.map(s => {
-    let coverCount = 0;
-    for (const pt of gapPoints) {
-      if (google.maps.geometry.spherical.computeDistanceBetween(pt, s.location) <= effectiveRadius * 2) {
-        coverCount++;
-      }
-    }
-    return { shelter: s, coverCount };
-  }).filter(x => x.coverCount > 0).sort((a, b) => b.coverCount - a.coverCount);
 
   // Iteratively add waypoints, re-checking coverage after each batch
   let bestRoute = null;
@@ -1528,12 +1502,10 @@ function setupDraggableRoute(route, shelters, radius) {
 
 function reanalyseDraggedRoute(draggedRoute, shelters, radius) {
   // Remove old drawn polylines (but not circles, markers, renderer)
-  const toRemove = [];
   const toKeep = [];
   for (const obj of mapObjects) {
     if (obj instanceof google.maps.Polyline && obj !== draggableRenderer) {
       obj.setMap(null);
-      toRemove.push(obj);
     } else {
       toKeep.push(obj);
     }
