@@ -1731,6 +1731,7 @@ function getRoute(origin, destination, waypoints) {
 async function fetchShelters(bbox, routePath) {
   const city = detectCity(routePath);
   detectedCity = city;
+  console.log(`Detected city: ${city.id} (${city.name})`);
   const shelters = [];
 
   try {
@@ -1753,6 +1754,11 @@ async function fetchShelters(bbox, routePath) {
 
     const resp = await fetch(fetchUrl);
     const data = await resp.json();
+
+    if (!resp.ok) {
+      console.warn(`${city.id} GIS HTTP error: ${resp.status}`);
+      return shelters;
+    }
 
     if (data.error) {
       console.warn(`${city.id} GIS error:`, data.error);

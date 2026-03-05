@@ -1,5 +1,5 @@
 // Server-side proxy for GIS endpoints that require custom headers (e.g. Jerusalem)
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   const { url } = req.query;
   if (!url) return res.status(400).json({ error: 'Missing url parameter' });
 
@@ -17,10 +17,14 @@ module.exports = async (req, res) => {
       fetchOpts.headers = { 'Referer': 'https://jergisng.jerusalem.muni.il/' };
     }
     const resp = await fetch(url, fetchOpts);
+    if (!resp.ok) {
+      return res.status(resp.status).json({ error: `Upstream returned ${resp.status}` });
+    }
     const data = await resp.json();
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
     res.status(200).json(data);
   } catch (e) {
+    console.error('Proxy fetch error:', e);
     res.status(502).json({ error: 'Proxy fetch failed', message: e.message });
   }
-};
+}
