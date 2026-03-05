@@ -1,32 +1,30 @@
 import sql from './_db.js';
 
-// Simple in-memory rate limit: max 5 submissions per IP per 10 minutes
-const rateLimitMap = new Map();
-const RATE_WINDOW = 10 * 60 * 1000;
+const RATE_WINDOW_MS = 10 * 60 * 1000;
 const RATE_MAX = 5;
 
-function checkRateLimit(ip) {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry) {
-    rateLimitMap.set(ip, { count: 1, start: now });
-    return true;
-  }
-  if (now - entry.start > RATE_WINDOW) {
-    rateLimitMap.set(ip, { count: 1, start: now });
-    return true;
-  }
-  if (entry.count >= RATE_MAX) return false;
-  entry.count++;
-  return true;
+async function checkRateLimit(ip) {
+  const cutoff = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
+  const rows = await sql`
+    SELECT COUNT(*) AS cnt FROM community_shelters
+    WHERE ip_address = ${ip}
+      AND created_at > ${cutoff}::timestamptz
+  `;
+  return parseInt(rows[0].cnt, 10) < RATE_MAX;
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
-  if (!checkRateLimit(ip))
-    return res.status(429).json({ error: 'Too many submissions. Please try again later.' });
+  const forwarded = req.headers['x-forwarded-for'];
+  const ip = (forwarded ? forwarded.split(',')[0].trim() : null) || req.socket?.remoteAddress || 'unknown';
+
+  try {
+    if (!(await checkRateLimit(ip)))
+      return res.status(429).json({ error: 'Too many submissions. Please try again later.' });
+  } catch (e) {
+    console.error('rate limit check error:', e);
+  }
 
   const { lat, lng, name, description } = req.body || {};
 
@@ -41,8 +39,8 @@ export default async function handler(req, res) {
 
   try {
     const rows = await sql`
-      INSERT INTO community_shelters (lat, lng, name, description)
-      VALUES (${lat}, ${lng}, ${shelterName}, ${shelterDesc})
+      INSERT INTO community_shelters (lat, lng, name, description, ip_address)
+      VALUES (${lat}, ${lng}, ${shelterName}, ${shelterDesc}, ${ip})
       RETURNING id, lat, lng, name, description, created_at
     `;
     return res.status(201).json(rows[0]);

@@ -107,7 +107,7 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
   shelters.forEach(function(s, i) {
     var isWaypoint = usedIds.has(s.id);
     var isCommunity = s.community === true;
-    var markerColor = isCommunity ? '#E88A1A' : '#1A4DE8';
+    var markerColor = isCommunity ? App.COMMUNITY_COLOR : '#1A4DE8';
     var esc = App.escapeHtml || function(x) { return x; };
     var displayName = isCommunity ? esc(s.type || s.name) : (s.type || s.name);
     var displayAddr = isCommunity ? esc(s.addr) : s.addr;
@@ -137,7 +137,7 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
       ? '<div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee;font-size:10px;color:#666;direction:rtl;text-align:right;max-width:240px">' + displayNotes + '</div>' : '';
 
     var communityBadgeHtml = isCommunity
-      ? '<div style="margin-bottom:4px"><span style="background:#E88A1A;color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">' + App.t('communityBadge') + '</span></div>' : '';
+      ? '<div style="margin-bottom:4px"><span style="background:' + App.COMMUNITY_COLOR + ';color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">' + App.t('communityBadge') + '</span></div>' : '';
 
     var iw = new google.maps.InfoWindow({
       content: '<div style="font-family:\'DM Mono\',monospace;font-size:12px;padding:2px 4px;max-width:280px">' +
@@ -241,9 +241,10 @@ App.clearAll = function() {
   App.shelterCircles = [];
   App.shelterRatings = {};
   if (App.communityMarkers) {
-    App.communityMarkers.forEach(function(o) { if (o.setMap) o.setMap(null); else if (o.close) o.close(); });
+    App.communityMarkers.forEach(function(o) { o.marker.setMap(null); o.iw.close(); });
     App.communityMarkers = [];
   }
+  if (App._savedCommunityIds) App._savedCommunityIds.clear();
   if (App.dirRenderer) App.dirRenderer.setDirections({ routes: [] });
   if (App.draggableRenderer) {
     App.draggableRenderer.setMap(null);
