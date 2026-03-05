@@ -39,54 +39,69 @@ App.getRoute = function(origin, destination, waypoints) {
   });
 };
 
+App._fetchCityShelters = async function(city, bbox) {
+  var shelters = [];
+  var params = new URLSearchParams({
+    where: '1=1',
+    geometry: bbox.west + ',' + bbox.south + ',' + bbox.east + ',' + bbox.north,
+    geometryType: 'esriGeometryEnvelope',
+    inSR: '4326',
+    spatialRel: 'esriSpatialRelIntersects',
+    outFields: city.outFields.join(','),
+    outSR: '4326',
+    returnGeometry: 'true',
+    f: 'json',
+  });
+
+  var fetchUrl;
+  if (city.staticUrl) {
+    fetchUrl = city.staticUrl;
+  } else {
+    fetchUrl = city.queryUrl + '?' + params;
+    if (city.useProxy) {
+      fetchUrl = '/api/shelters-proxy?url=' + encodeURIComponent(fetchUrl);
+    }
+  }
+
+  var resp = await fetch(fetchUrl);
+  if (!resp.ok) throw new Error('Shelter data request failed (' + resp.status + ')');
+  var data = await resp.json();
+
+  if (data.error) {
+    console.warn(city.id + ' GIS error:', data.error);
+    return shelters;
+  }
+
+  (data.features || []).forEach(function(feat) {
+    var parsed = city.parseFeat(feat);
+    if (!parsed) return;
+    shelters.push(Object.assign({}, parsed, {
+      source: city.id,
+      location: new google.maps.LatLng(parsed.lat, parsed.lon),
+    }));
+  });
+
+  return shelters;
+};
+
 App.fetchShelters = async function(bbox, routePath) {
-  var city = App.detectCity(routePath);
-  App.detectedCity = city;
+  var cities = App.detectCities(routePath);
+  App.detectedCities = cities;
+  App.detectedCity = cities[0];
   var shelters = [];
 
-  try {
-    var params = new URLSearchParams({
-      where: '1=1',
-      geometry: bbox.west + ',' + bbox.south + ',' + bbox.east + ',' + bbox.north,
-      geometryType: 'esriGeometryEnvelope',
-      inSR: '4326',
-      spatialRel: 'esriSpatialRelIntersects',
-      outFields: city.outFields.join(','),
-      outSR: '4326',
-      returnGeometry: 'true',
-      f: 'json',
-    });
+  // Fetch from all matching cities in parallel
+  var results = await Promise.allSettled(
+    cities.map(function(city) { return App._fetchCityShelters(city, bbox); })
+  );
 
-    var fetchUrl;
-    if (city.staticUrl) {
-      fetchUrl = city.staticUrl;
+  results.forEach(function(result, i) {
+    if (result.status === 'fulfilled') {
+      shelters = shelters.concat(result.value);
     } else {
-      fetchUrl = city.queryUrl + '?' + params;
-      if (city.useProxy) {
-        fetchUrl = '/api/shelters-proxy?url=' + encodeURIComponent(fetchUrl);
-      }
+      console.warn(cities[i].id + ' GIS fetch failed', result.reason);
     }
-
-    var resp = await fetch(fetchUrl);
-    if (!resp.ok) throw new Error('Shelter data request failed (' + resp.status + ')');
-    var data = await resp.json();
-
-    if (data.error) {
-      console.warn(city.id + ' GIS error:', data.error);
-      return shelters;
-    }
-
-    (data.features || []).forEach(function(feat) {
-      var parsed = city.parseFeat(feat);
-      if (!parsed) return;
-      shelters.push(Object.assign({}, parsed, {
-        source: city.id,
-        location: new google.maps.LatLng(parsed.lat, parsed.lon),
-      }));
-    });
-  } catch(e) {
-    console.warn(city.id + ' GIS fetch failed', e);
-  }
+  });
 
   // Merge community-reported shelters (if toggle is checked)
   var includeCommunity = document.getElementById('includeCommunity');

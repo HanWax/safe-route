@@ -25,6 +25,26 @@ App.CITY_CONFIGS = [
     },
   },
   {
+    id: 'ramat-gan',
+    name: 'Ramat Gan',
+    nameHe: '\u05e8\u05de\u05ea \u05d2\u05df',
+    center: { lat: 32.08, lng: 34.82 },
+    staticUrl: '/api/ramat-gan-shelters',
+    outFields: ['*'],
+    parseFeat: function(feat) {
+      var a = feat.attributes, g = feat.geometry;
+      var lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: 'rg-' + a.OBJECTID, lat: lat, lon: lon,
+        name: a.name || '\u05de\u05e7\u05dc\u05d8 \u05e6\u05d9\u05d1\u05d5\u05e8\u05d9', type: '',
+        addr: a.address || '', addrEng: '',
+        area: 0, filtration: '', notes: a.dynamicField || '',
+        status: '', accessible: '',
+      };
+    },
+  },
+  {
     id: 'beer-sheva',
     name: "Be'er Sheva",
     nameHe: '\u05d1\u05d0\u05e8 \u05e9\u05d1\u05e2',
@@ -393,17 +413,46 @@ App.CITY_CONFIGS = [
 ];
 
 App.detectCity = function(routePath) {
-  if (!routePath || !routePath.length) return App.CITY_CONFIGS[0];
-  var mid = routePath[Math.floor(routePath.length / 2)];
-  var midLat = mid.lat(), midLng = mid.lng();
+  var cities = App.detectCities(routePath);
+  return cities[0] || App.CITY_CONFIGS[0];
+};
 
-  var best = null, bestDist = Infinity;
-  for (var i = 0; i < App.CITY_CONFIGS.length; i++) {
-    var cfg = App.CITY_CONFIGS[i];
-    var d = Math.sqrt(
-      Math.pow(midLat - cfg.center.lat, 2) + Math.pow(midLng - cfg.center.lng, 2)
-    );
-    if (d < bestDist) { bestDist = d; best = cfg; }
+App.detectCities = function(routePath) {
+  if (!routePath || !routePath.length) return [App.CITY_CONFIGS[0]];
+
+  // Compute route bounding box
+  var s = Infinity, n = -Infinity, w = Infinity, e = -Infinity;
+  for (var i = 0; i < routePath.length; i++) {
+    var lat = routePath[i].lat(), lng = routePath[i].lng();
+    if (lat < s) s = lat; if (lat > n) n = lat;
+    if (lng < w) w = lng; if (lng > e) e = lng;
   }
-  return best;
+
+  // ~5km buffer in degrees
+  var buf = 0.045;
+  s -= buf; n += buf; w -= buf; e += buf;
+
+  var matches = [];
+  for (var j = 0; j < App.CITY_CONFIGS.length; j++) {
+    var cfg = App.CITY_CONFIGS[j];
+    if (cfg.center.lat >= s && cfg.center.lat <= n &&
+        cfg.center.lng >= w && cfg.center.lng <= e) {
+      matches.push(cfg);
+    }
+  }
+
+  if (!matches.length) {
+    // Fallback: pick the single nearest city
+    var mid = routePath[Math.floor(routePath.length / 2)];
+    var midLat = mid.lat(), midLng = mid.lng();
+    var best = null, bestDist = Infinity;
+    for (var k = 0; k < App.CITY_CONFIGS.length; k++) {
+      var c = App.CITY_CONFIGS[k];
+      var d = Math.sqrt(Math.pow(midLat - c.center.lat, 2) + Math.pow(midLng - c.center.lng, 2));
+      if (d < bestDist) { bestDist = d; best = c; }
+    }
+    return [best];
+  }
+
+  return matches;
 };
