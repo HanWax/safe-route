@@ -1,6 +1,6 @@
 window.App = window.App || {};
 
-App.SHEET_PEEK = 120;
+App.SHEET_PEEK = 80;
 App.SHEET_HALF = 0.45;
 App.SHEET_FULL = 0.85;
 App.sheetState = 'hidden';
@@ -83,16 +83,12 @@ App.initBottomSheet = function() {
       if (Math.abs(currentY - targets[i].y) < Math.abs(currentY - closest.y)) closest = targets[i];
     }
 
-    if (currentY > peekY + 50) {
-      App.setSheetPosition('hidden');
-    } else {
-      App.setSheetPosition(closest.state);
-    }
+    App.setSheetPosition(closest.state);
   });
 
-  App.setSheetPosition('hidden', false);
+  App.setSheetPosition('peek', false);
 
-  // Show welcome content in bottom sheet
+  // Show welcome/example content
   App.showMobileWelcome();
 };
 
@@ -101,10 +97,7 @@ App.showMobileWelcome = function() {
   if (!content) return;
   content.innerHTML =
     '<div style="text-align:center;padding:8px 0 4px">' +
-      '<div style="font-size:11px;color:var(--ink);line-height:1.7;max-width:260px;margin:0 auto">' +
-        App.t('emptyWhat') +
-      '</div>' +
-      '<div style="margin-top:14px;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:500">' +
+      '<div style="margin-top:4px;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:500">' +
         App.t('tryExample') +
       '</div>' +
       '<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">' +
@@ -113,7 +106,6 @@ App.showMobileWelcome = function() {
         '<button class="example-chip" onclick="App.loadExample(\'haifa\')">' + App.t('exampleHaifa') + '</button>' +
       '</div>' +
     '</div>';
-  App.setSheetPosition('peek');
 };
 
 App.syncInputs = function() {

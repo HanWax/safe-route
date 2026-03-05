@@ -186,12 +186,11 @@
 
   <!-- MAP -->
   <main class="map-wrap">
-    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle panel">☰</button>
-
-    <!-- MOBILE: Floating search bar -->
-    <div class="mobile-search" id="mobileSearch">
-      <div class="mobile-search-card">
-        <div class="mobile-search-header">
+    <!-- MOBILE: Bottom sheet (search + results) -->
+    <div class="bottom-sheet" id="bottomSheet">
+      <div class="drag-handle" id="dragHandle"></div>
+      <div class="mobile-sheet-search" id="mobileSheetSearch">
+        <div class="mobile-sheet-header">
           <div class="logo">
             <div class="logo-shield">🛡</div>
             Miklat
@@ -225,12 +224,6 @@
             </div>
             <button class="swap-btn mobile-swap-btn" onclick="swapLocations()" data-i18n-title="swapTooltip" title="Swap origin and destination">
               <svg viewBox="0 0 24 24"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg>
-            </button>
-          </div>
-          <div class="mobile-location-chips">
-            <button class="location-chip" onclick="useMyLocation('mobileOrigin')" id="mobileOriginChip">
-              <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-              <span data-i18n="useCurrentLocation">Use current location</span>
             </button>
           </div>
         </div>
@@ -272,11 +265,6 @@
           </button>
         </div>
       </div>
-    </div>
-
-    <!-- MOBILE: Bottom sheet -->
-    <div class="bottom-sheet" id="bottomSheet">
-      <div class="drag-handle" id="dragHandle"></div>
       <div class="mobile-status" id="mobileStatusBar" aria-live="polite"></div>
       <div class="bottom-sheet-content" id="bottomSheetContent">
       </div>
