@@ -127,16 +127,14 @@
         <span data-i18n="dragHint">✋ Drag the route on the map to adjust it manually. Coverage will update in real time.</span>
       </div>
 
-      <!-- GAP WARNINGS -->
-      <div id="gapSection" style="display:none">
-        <div class="section-head" data-i18n="coverageGaps">⚠ Coverage gaps</div>
-        <div id="gapList"></div>
-      </div>
-
       <!-- SHELTER LIST -->
       <div id="shelterSection" style="display:none">
-        <div class="section-head" data-i18n="miklatimOnRoute">Miklatim on route</div>
-        <div id="shelterList"></div>
+        <div class="section-head section-head--toggle" id="shelterToggle">
+          <span data-i18n="miklatimOnRoute">Miklatim on route</span>
+          <span class="shelter-count" id="shelterCount"></span>
+          <svg class="section-chevron" viewBox="0 0 24 24" width="16" height="16"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </div>
+        <div id="shelterList" class="shelter-list-collapsible"></div>
         <div class="disc">
           <strong data-i18n="safetyNoticeLabel">⚠ Safety notice:</strong> <span data-i18n="safetyNoticeText">Shelter data from municipal GIS sources. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (פיקוד העורף) guidance in emergencies.</span>
         </div>

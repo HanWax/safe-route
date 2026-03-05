@@ -59,7 +59,33 @@ App.initMap = function() {
   google.maps.event.trigger(App.map, 'resize');
 };
 
-App.drawRoute = function(coveredSegs, gapSegs) {
+App._routeInfoWindow = null;
+
+App._addRouteTooltip = function(polyline, content) {
+  var isMobile = App.isMobile();
+  var eventName = isMobile ? 'click' : 'mouseover';
+
+  polyline.addListener(eventName, function(e) {
+    if (App._routeInfoWindow) App._routeInfoWindow.close();
+    App._routeInfoWindow = new google.maps.InfoWindow({
+      content: '<div style="font-family:\'DM Mono\',monospace;font-size:11px;padding:2px 4px;white-space:nowrap">' + content + '</div>',
+      position: e.latLng,
+      disableAutoPan: true,
+    });
+    App._routeInfoWindow.open(App.map);
+  });
+
+  if (!isMobile) {
+    polyline.addListener('mouseout', function() {
+      if (App._routeInfoWindow) {
+        App._routeInfoWindow.close();
+        App._routeInfoWindow = null;
+      }
+    });
+  }
+};
+
+App.drawRoute = function(coveredSegs, gapSegs, gaps) {
   coveredSegs.forEach(function(pts) {
     var pl = new google.maps.Polyline({
       path: pts, map: App.map,
@@ -68,9 +94,10 @@ App.drawRoute = function(coveredSegs, gapSegs) {
       strokeOpacity: 0.9,
       zIndex: 4,
     });
+    App._addRouteTooltip(pl, App.t('coveredTooltip'));
     App.mapObjects.push(pl);
   });
-  gapSegs.forEach(function(pts) {
+  gapSegs.forEach(function(pts, i) {
     var pl = new google.maps.Polyline({
       path: pts, map: App.map,
       strokeColor: '#D93B22',
@@ -82,6 +109,11 @@ App.drawRoute = function(coveredSegs, gapSegs) {
         offset: '0', repeat: '12px',
       }],
     });
+    var gap = gaps && gaps[i];
+    if (gap) {
+      var walkMin = Math.ceil(gap.distMeters / 1.4 / 60);
+      App._addRouteTooltip(pl, App.t('gapTooltip')(gap.distMeters, walkMin));
+    }
     App.mapObjects.push(pl);
   });
 };
@@ -250,11 +282,14 @@ App.clearAll = function() {
     App.draggableRenderer = null;
   }
 
+  if (App._routeInfoWindow) {
+    App._routeInfoWindow.close();
+    App._routeInfoWindow = null;
+  }
+
   document.getElementById('scoreWrap').classList.remove('show');
   document.getElementById('shelterSection').style.display = 'none';
-  document.getElementById('gapSection').style.display = 'none';
   document.getElementById('shelterList').innerHTML = '';
-  document.getElementById('gapList').innerHTML = '';
   document.getElementById('legend').classList.remove('show');
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('dragHint').classList.remove('show');

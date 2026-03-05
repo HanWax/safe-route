@@ -197,7 +197,7 @@ App.run = async function() {
 
     var analysis = App.analyseRouteCoverage(finalRoute.path, shelters, radius);
 
-    App.drawRoute(analysis.coveredPolyline, analysis.gapPolylines);
+    App.drawRoute(analysis.coveredPolyline, analysis.gapPolylines, analysis.gaps);
     App.drawShelterCircles(shelters, radius / App.WALK_FACTOR);
     App.drawShelterMarkers(shelters, buildResult.usedShelters);
     App.drawEndpoints(finalRoute);
@@ -208,7 +208,6 @@ App.run = async function() {
     App.renderScore(analysis.coveredPct, analysis.gaps, finalRoute, shelters.length);
     App.setStatus(App.t('statusCalcWalk'), 'info');
     var nearby = await App.renderShelterList(shelters, finalRoute.path, radius);
-    App.renderGaps(analysis.gaps);
     App.fetchAndDisplayRatings((nearby || []).map(function(s) { return s.id; }));
 
     document.getElementById('legend').classList.add('show');

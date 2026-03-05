@@ -172,31 +172,24 @@ App.populateBottomSheet = function() {
     content.appendChild(clone);
   }
 
-  var gapSection = document.getElementById('gapSection');
-  if (gapSection && gapSection.style.display !== 'none') {
-    var clone = gapSection.cloneNode(true);
-    App._dedupeClone(clone, 'mb-');
-    clone.id = 'mobileGapSection';
-    content.appendChild(clone);
-  }
-
   var shelterSection = document.getElementById('shelterSection');
   if (shelterSection && shelterSection.style.display !== 'none') {
     var clone = shelterSection.cloneNode(true);
     App._dedupeClone(clone, 'mb-');
     clone.id = 'mobileShelterSection';
+    var mobileToggle = clone.querySelector('.section-head--toggle');
+    var mobileList = clone.querySelector('.shelter-list-collapsible');
+    if (mobileToggle && mobileList) {
+      mobileToggle.addEventListener('click', function() {
+        var isOpen = mobileList.classList.toggle('open');
+        mobileToggle.classList.toggle('open', isOpen);
+      });
+    }
     clone.querySelectorAll('.s-card').forEach(function(card) {
       var origId = card.id.replace('mb-', '');
       card.addEventListener('click', function() {
         var origCard = document.getElementById(origId);
         if (origCard) origCard.click();
-        App.setSheetPosition('peek');
-      });
-    });
-    clone.querySelectorAll('.gap-card').forEach(function(card, i) {
-      var origCards = gapSection.querySelectorAll('.gap-card');
-      card.addEventListener('click', function() {
-        if (origCards[i]) origCards[i].click();
         App.setSheetPosition('peek');
       });
     });
