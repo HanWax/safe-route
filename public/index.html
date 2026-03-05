@@ -431,7 +431,6 @@
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.18);
       padding: 10px 12px;
-      overflow: hidden;
     }
     .mobile-search-header {
       display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
@@ -441,9 +440,10 @@
       font-size: 13px; gap: 5px;
     }
     .mobile-search-header .mobile-lang-sel {
-      background: var(--paper); color: var(--ink); border: 1px solid var(--border);
-      font-family: 'DM Mono', monospace; font-size: 11px; padding: 3px 6px;
-      cursor: pointer; border-radius: 4px;
+      background: var(--paper); color: var(--ink); border: 1.5px solid var(--ink);
+      font-family: 'DM Mono', monospace; font-size: 12px; padding: 4px 8px;
+      cursor: pointer; border-radius: 4px; flex-shrink: 0;
+      -webkit-appearance: menulist; appearance: menulist;
     }
     .mobile-search-header .logo-shield {
       width: 20px; height: 20px; font-size: 9px;
@@ -500,12 +500,12 @@
       max-height: 85vh;
       transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
       will-change: transform;
-      touch-action: none;
     }
     .bottom-sheet.no-transition { transition: none; }
     .bottom-sheet .drag-handle {
       display: flex; justify-content: center; padding: 10px 0 6px;
       cursor: grab;
+      touch-action: none;
     }
     .bottom-sheet .drag-handle::after {
       content: ''; width: 36px; height: 4px;
@@ -515,6 +515,8 @@
       overflow-y: auto; padding: 0 16px 20px;
       max-height: calc(85vh - 30px);
       -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
     }
     .bottom-sheet-content::-webkit-scrollbar { width: 0; }
 
@@ -1060,9 +1062,9 @@ function setSheetPosition(state, animate) {
   }
   sheet.style.transform = `translateY(${translateY}px)`;
 
-  // Allow scrolling only when fully open
+  // Allow scrolling when sheet is half or fully open
   const content = document.getElementById('bottomSheetContent');
-  if (content) content.style.overflowY = state === 'full' ? 'auto' : 'hidden';
+  if (content) content.style.overflowY = (state === 'full' || state === 'half') ? 'auto' : 'hidden';
 }
 
 function initBottomSheet() {
@@ -1259,6 +1261,9 @@ function initMap() {
     polylineOptions: { strokeOpacity: 0 },
   });
   dirRenderer.setMap(map);
+
+  // Tap/click on map closes any open info window
+  map.addListener('click', () => { closeAllIW(); });
 
   // Autocomplete restricted to IL
   ['origin','dest','mobileOrigin','mobileDest'].forEach(id => {
