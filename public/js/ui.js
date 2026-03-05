@@ -31,19 +31,21 @@ App.setBusy = function(b) {
   if (mBtn) { mBtn.classList.toggle('loading', b); mBtn.disabled = b; }
 };
 
-App.renderScore = function(pct, gaps, route, shelterCount, coverageTarget) {
-  coverageTarget = coverageTarget || 80;
+App.renderScore = function(pct, gaps, route, shelterCount) {
   var wrap = document.getElementById('scoreWrap');
   wrap.classList.add('show');
 
   var el = document.getElementById('scorePct');
-  var meetsTarget = pct >= coverageTarget;
-  el.className = 'score-pct ' + (meetsTarget ? (pct >= 99 ? 'full' : 'high') : pct >= 50 ? 'mid' : 'low');
+  el.className = 'score-pct ' + (pct >= 99 ? 'full' : pct >= 70 ? 'high' : pct >= 50 ? 'mid' : 'low');
   App._countUp(el, pct, '%', 700);
 
   var bar = document.getElementById('scoreBar');
   bar.style.width = '0%';
-  bar.style.background = meetsTarget ? (pct >= 99 ? '#18C96A' : '#8BC34A') : pct >= 50 ? '#E8920F' : '#D93B22';
+  var cs = getComputedStyle(document.documentElement);
+  bar.style.background = pct >= 99 ? cs.getPropertyValue('--green').trim()
+    : pct >= 70 ? cs.getPropertyValue('--green-light').trim()
+    : pct >= 50 ? cs.getPropertyValue('--amber').trim()
+    : cs.getPropertyValue('--red').trim();
   requestAnimationFrame(function() {
     requestAnimationFrame(function() {
       bar.style.width = pct + '%';
@@ -52,9 +54,7 @@ App.renderScore = function(pct, gaps, route, shelterCount, coverageTarget) {
 
   var scoreLabel = document.getElementById('scoreLabel');
   if (scoreLabel) {
-    scoreLabel.textContent = meetsTarget
-      ? 'Coverage (target: ' + coverageTarget + '% \u2713)'
-      : 'Coverage (target: ' + coverageTarget + '%)';
+    scoreLabel.textContent = App.t('routeCoverage');
   }
 
   var totalSec = route.totalDuration || 0;

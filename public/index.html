@@ -4,17 +4,19 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>מקלט | Safe Route Planner</title>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@700;800;900&family=Noto+Sans+Hebrew:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800;900&family=Noto+Sans+Hebrew:wght@400;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/css/styles.css"/>
 </head>
 <body>
 
 <header>
-  <div class="logo">
-    <div class="logo-shield">🛡</div>
+  <h1 class="logo">
+    <div class="logo-shield" aria-hidden="true">🛡</div>
     Miklat Route
     <span class="logo-he">מקלט</span>
-  </div>
+  </h1>
   <select id="langSel" onchange="setLang(this.value)" aria-label="Language">
     <option value="en">EN</option>
     <option value="he">עב</option>
@@ -25,7 +27,7 @@
 <div class="app">
 
   <!-- SIDEBAR -->
-  <div class="sidebar">
+  <aside class="sidebar" aria-label="Route settings">
     <div class="sidebar-scroll">
 
       <div class="lbl" data-i18n="lblRoute">Route</div>
@@ -60,13 +62,6 @@
         </select>
       </div>
 
-      <div class="target-row">
-        <label data-i18n="coverageTarget">Coverage target</label>
-        <input type="range" class="target-slider" id="coverageTarget" min="50" max="100" step="5" value="80"/>
-        <span class="target-val" id="coverageTargetVal">80%</span>
-      </div>
-      <div class="target-hint" data-i18n="targetHint">Higher targets may produce longer, more circuitous routes.</div>
-
       <div class="toggle-row">
         <label for="showRadius" data-i18n="showRadius">Show shelter radius</label>
         <label class="toggle-switch">
@@ -92,7 +87,7 @@
         <div class="sp"></div>
       </button>
 
-      <div class="status" id="status"></div>
+      <div class="status" id="status" aria-live="polite"></div>
 
       <!-- SCORE -->
       <div class="score-wrap" id="scoreWrap">
@@ -101,11 +96,11 @@
             <div class="score-pct" id="scorePct">—</div>
             <div class="score-label" id="scoreLabel" data-i18n="routeCoverage">Route coverage</div>
           </div>
-          <div style="text-align:right">
-            <div style="font-size:10px;color:var(--muted)" data-i18n="routeLength">Route length</div>
-            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px" id="routeDist">—</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:4px" data-i18n="walkTime">Walk time</div>
-            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px" id="routeTime">—</div>
+          <div class="score-detail">
+            <div class="score-detail-label" data-i18n="routeLength">Route length</div>
+            <div class="score-detail-value" id="routeDist">—</div>
+            <div class="score-detail-label score-detail-label--spaced" data-i18n="walkTime">Walk time</div>
+            <div class="score-detail-value" id="routeTime">—</div>
           </div>
         </div>
         <div class="score-bar-track">
@@ -151,7 +146,7 @@
       </div>
 
       <div class="empty" id="emptyState">
-        <div class="empty-icon">🛡</div>
+        <div class="empty-icon" aria-hidden="true">🛡</div>
         <div class="empty-txt" data-i18n="emptyWhat">A <strong>miklat</strong> (מקלט) is a bomb shelter. This app plans walking routes that keep you close to one at all times.</div>
         <div class="empty-steps">
           <div class="empty-step">
@@ -172,17 +167,17 @@
         <div class="empty-divider"></div>
         <div class="empty-examples-label" data-i18n="tryExample">Try an example route</div>
         <div class="empty-examples">
-          <button class="example-chip" onclick="App.loadExample('tlv')" data-i18n="exampleTlv">Tel Aviv: Dizengoff → Rothschild</button>
-          <button class="example-chip" onclick="App.loadExample('jer')" data-i18n="exampleJer">Jerusalem: Jaffa Gate → Mahane Yehuda</button>
-          <button class="example-chip" onclick="App.loadExample('haifa')" data-i18n="exampleHaifa">Haifa: Carmel Center → Port</button>
+          <button type="button" class="example-chip" onclick="App.loadExample('tlv')" data-i18n="exampleTlv">Tel Aviv: Dizengoff → Rothschild</button>
+          <button type="button" class="example-chip" onclick="App.loadExample('jer')" data-i18n="exampleJer">Jerusalem: Jaffa Gate → Mahane Yehuda</button>
+          <button type="button" class="example-chip" onclick="App.loadExample('haifa')" data-i18n="exampleHaifa">Haifa: Carmel Center → Port</button>
         </div>
       </div>
 
     </div>
-  </div>
+  </aside>
 
   <!-- MAP -->
-  <div class="map-wrap">
+  <main class="map-wrap">
     <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle panel">☰</button>
 
     <!-- MOBILE: Floating search bar -->
@@ -250,11 +245,6 @@
               <option value="600">~600m</option>
             </select>
           </div>
-          <div class="target-row">
-            <label data-i18n="coverageTarget">Coverage target</label>
-            <input type="range" class="target-slider" id="mobileCoverageTarget" min="50" max="100" step="5" value="80"/>
-            <span class="target-val" id="mobileCoverageTargetVal">80%</span>
-          </div>
           <div class="toggle-row">
             <label for="mobileShowRadius" data-i18n="showRadius">Show shelter radius</label>
             <label class="toggle-switch">
@@ -279,7 +269,7 @@
     <!-- MOBILE: Bottom sheet -->
     <div class="bottom-sheet" id="bottomSheet">
       <div class="drag-handle" id="dragHandle"></div>
-      <div class="mobile-status" id="mobileStatusBar"></div>
+      <div class="mobile-status" id="mobileStatusBar" aria-live="polite"></div>
       <div class="bottom-sheet-content" id="bottomSheetContent">
       </div>
     </div>
@@ -304,7 +294,7 @@
     </div>
 
     <div id="map"></div>
-    <div class="legend" id="legend">
+    <div class="legend" id="legend" role="region" aria-label="Map legend">
       <div class="legend-title" data-i18n="legend">Legend</div>
       <div class="leg-row"><div class="leg-dot" style="background:var(--green);border:1.5px solid var(--ink)"></div> <span data-i18n="legStart">Start point</span></div>
       <div class="leg-row"><div class="leg-dot" style="background:var(--red);border:1.5px solid var(--ink)"></div> <span data-i18n="legEnd">End point</span></div>
@@ -320,7 +310,7 @@
         <span data-i18n="legDrag">✋ Drag route to adjust</span>
       </div>
     </div>
-  </div>
+  </main>
 </div>
 
 <script src="/js/i18n.js"></script>

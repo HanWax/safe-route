@@ -121,14 +121,9 @@ App.syncInputs = function() {
   var mo = document.getElementById('mobileOrigin');
   var md = document.getElementById('mobileDest');
   var mr = document.getElementById('mobileRadius');
-  var mct = document.getElementById('mobileCoverageTarget');
   if (mo) document.getElementById('origin').value = mo.value;
   if (md) document.getElementById('dest').value = md.value;
   if (mr) document.getElementById('radius').value = mr.value;
-  if (mct) {
-    document.getElementById('coverageTarget').value = mct.value;
-    document.getElementById('coverageTargetVal').textContent = mct.value + '%';
-  }
 };
 
 App.setMobileStatus = function(msg, type) {
@@ -149,6 +144,12 @@ App.initMobileSettings = function() {
   });
 };
 
+App._dedupeClone = function(clone, prefix) {
+  clone.querySelectorAll('[id]').forEach(function(el) {
+    el.id = prefix + el.id;
+  });
+};
+
 App.populateBottomSheet = function() {
   var content = document.getElementById('bottomSheetContent');
   if (!content) return;
@@ -158,6 +159,7 @@ App.populateBottomSheet = function() {
   var scoreWrap = document.getElementById('scoreWrap');
   if (scoreWrap) {
     var clone = scoreWrap.cloneNode(true);
+    App._dedupeClone(clone, 'mb-');
     clone.id = 'mobileScoreWrap';
     clone.classList.add('show');
     content.appendChild(clone);
@@ -173,6 +175,7 @@ App.populateBottomSheet = function() {
   var gapSection = document.getElementById('gapSection');
   if (gapSection && gapSection.style.display !== 'none') {
     var clone = gapSection.cloneNode(true);
+    App._dedupeClone(clone, 'mb-');
     clone.id = 'mobileGapSection';
     content.appendChild(clone);
   }
@@ -180,10 +183,12 @@ App.populateBottomSheet = function() {
   var shelterSection = document.getElementById('shelterSection');
   if (shelterSection && shelterSection.style.display !== 'none') {
     var clone = shelterSection.cloneNode(true);
+    App._dedupeClone(clone, 'mb-');
     clone.id = 'mobileShelterSection';
     clone.querySelectorAll('.s-card').forEach(function(card) {
+      var origId = card.id.replace('mb-', '');
       card.addEventListener('click', function() {
-        var origCard = document.getElementById(card.id);
+        var origCard = document.getElementById(origId);
         if (origCard) origCard.click();
         App.setSheetPosition('peek');
       });
@@ -202,6 +207,7 @@ App.populateBottomSheet = function() {
   var legend = document.getElementById('legend');
   if (legend && legend.classList.contains('show')) {
     var legendClone = legend.cloneNode(true);
+    App._dedupeClone(legendClone, 'mb-');
     legendClone.id = 'mobileLegend';
     legendClone.classList.add('mobile-legend-inline');
     content.appendChild(legendClone);
