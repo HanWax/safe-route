@@ -351,6 +351,7 @@ App.shareRoute = function(e) {
 
   // Fallback: copy to clipboard
   var clickedBtn = e && e.target ? e.target.closest('.share-btn') : null;
+  if (!navigator.clipboard) { window.open(url, '_blank', 'noopener'); return; }
   navigator.clipboard.writeText(url).then(function() {
     var span = clickedBtn ? clickedBtn.querySelector('span') : document.querySelector('#shareRow .share-btn--copy span');
     if (!span) return;
