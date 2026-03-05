@@ -237,20 +237,18 @@
       </div>
     </div>
 
-    <!-- Community miklat placement bar -->
-    <div class="community-bar" id="communityBar">
-      <div class="community-bar-hint" id="communityHint" data-i18n="addMiklatHint">Click on the map to place your private miklat.</div>
-      <button class="community-bar-cancel" onclick="cancelAddMiklat()" data-i18n="cancelPlacement">Cancel</button>
-    </div>
-
     <!-- Community miklat form popup -->
     <div class="community-form-overlay" id="communityFormOverlay">
       <div class="community-form">
-        <div class="community-form-title" data-i18n="addMiklat">Add private miklat</div>
+        <div class="community-form-title" data-i18n="addMiklat">Add community-reported miklat</div>
         <div class="community-form-disclaimer" data-i18n="communityDisclaimer">Community-reported shelters are unverified. Use at your own discretion.</div>
+        <label data-i18n="communityAddress">Address</label>
+        <input type="text" id="communityAddressInput" class="plain" data-i18n-placeholder="communityAddressPh" placeholder="Enter address..." maxlength="300"/>
+        <div class="community-form-addr-status" id="communityAddrStatus"></div>
         <label data-i18n="communityName">Name / description</label>
         <input type="text" id="communityNameInput" class="plain" data-i18n-placeholder="communityNamePh" placeholder="e.g. Building mamad, 3rd floor" maxlength="200"/>
         <textarea id="communityDescInput" data-i18n-placeholder="communityDescPh" placeholder="Optional details (access instructions, floor, etc.)" maxlength="500"></textarea>
+        <div class="community-form-hint" data-i18n="addMiklatHint">Right-click on the map to place a miklat, or use the button to enter an address.</div>
         <div class="community-form-actions">
           <button class="community-form-cancel" onclick="cancelAddMiklat()" data-i18n="cancelPlacement">Cancel</button>
           <button class="community-form-save" id="communitySaveBtn" onclick="saveCommunityMiklat()" data-i18n="communitySave">Save</button>

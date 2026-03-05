@@ -42,6 +42,11 @@ App.initMap = function() {
 
   App.map.addListener('click', function() { App.closeAllIW(); });
 
+  // Right-click to add community miklat (always available once map loads)
+  App.map.addListener('rightclick', function(e) {
+    if (App.handleMapRightClick) App.handleMapRightClick(e);
+  });
+
   ['origin','dest','mobileOrigin','mobileDest'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
