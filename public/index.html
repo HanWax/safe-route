@@ -602,7 +602,7 @@
     <option value="en">EN</option>
     <option value="he">עב</option>
   </select>
-  <div class="header-tag" data-i18n="headerTag">Shelter-Safe Walking · Tel Aviv-Yafo</div>
+  <div class="header-tag" data-i18n="headerTag">Shelter-Safe Walking · Israel</div>
 </header>
 
 <div class="app">
@@ -707,16 +707,16 @@
         <div class="section-head" data-i18n="miklatimOnRoute">Miklatim on route</div>
         <div id="shelterList"></div>
         <div class="disc">
-          <strong data-i18n="safetyNoticeLabel">⚠ Safety notice:</strong> <span data-i18n="safetyNoticeText">Shelter data from Tel Aviv-Yafo Municipality GIS. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (פיקוד העורף) guidance in emergencies.</span>
+          <strong data-i18n="safetyNoticeLabel">⚠ Safety notice:</strong> <span data-i18n="safetyNoticeText">Shelter data from municipal GIS sources. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (פיקוד העורף) guidance in emergencies.</span>
         </div>
-        <div class="data-src">
-          Data: <a href="https://gisn.tel-aviv.gov.il" target="_blank">עיריית תל אביב-יפו — GIS</a> · Layer 592
+        <div class="data-src" id="dataSrc">
+          Data: Municipal GIS
         </div>
       </div>
 
       <div class="empty" id="emptyState">
         <div class="empty-icon">🗺️</div>
-        <div class="empty-txt" data-i18n="emptyText">Enter a start and end point in Tel Aviv.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.</div>
+        <div class="empty-txt" data-i18n="emptyText">Enter a start and end point in Israel.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.</div>
       </div>
 
     </div>
@@ -819,7 +819,7 @@
 // ═══════════════════════════════════════════════════════
 const STRINGS = {
   en: {
-    headerTag: 'Shelter-Safe Walking · Tel Aviv-Yafo',
+    headerTag: 'Shelter-Safe Walking · Israel',
     lblRoute: 'Route',
     phStart: 'Start…',
     phDest: 'Destination…',
@@ -841,8 +841,8 @@ const STRINGS = {
     coverageGaps: '⚠ Coverage gaps',
     miklatimOnRoute: 'Miklatim on route',
     safetyNoticeLabel: '⚠ Safety notice:',
-    safetyNoticeText: 'Shelter data from Tel Aviv-Yafo Municipality GIS. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (פיקוד העורף) guidance in emergencies.',
-    emptyText: 'Enter a start and end point in Tel Aviv.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.',
+    safetyNoticeText: 'Shelter data from municipal GIS sources. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (פיקוד העורף) guidance in emergencies.',
+    emptyText: 'Enter a start and end point in Israel.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.',
     legend: 'Legend',
     legStart: 'Start point',
     legEnd: 'End point',
@@ -857,7 +857,7 @@ const STRINGS = {
     statusConfigErr: 'Could not load API config. Is GOOGLE_MAPS_API_KEY set in Vercel?',
     statusLoadingMaps: 'Loading Google Maps…',
     statusGettingRoute: 'Getting walking route…',
-    statusFetchingShelters: 'Fetching מקלטים from Tel Aviv Municipality…',
+    statusFetchingShelters: (city) => `Fetching מקלטים from ${city}…`,
     statusFoundShelters: (n, tgt) => `Found ${n} miklatim. Optimising for ${tgt}% coverage…`,
     statusRoutingWaypoints: (iter, n) => `Iteration ${iter}: routing through ${n} shelter waypoints…`,
     statusBestAchievable: (pct, tgt) => `Best achievable: ${pct}% (target: ${tgt}%). Drag the route to improve.`,
@@ -877,7 +877,7 @@ const STRINGS = {
     myLocation: 'My Location',
   },
   he: {
-    headerTag: 'הליכה מוגנת · תל אביב-יפו',
+    headerTag: 'הליכה מוגנת · ישראל',
     lblRoute: 'מסלול',
     phStart: 'נקודת התחלה…',
     phDest: 'יעד…',
@@ -899,8 +899,8 @@ const STRINGS = {
     coverageGaps: '⚠ פערי כיסוי',
     miklatimOnRoute: 'מקלטים במסלול',
     safetyNoticeLabel: '⚠ שימו לב:',
-    safetyNoticeText: 'נתוני המקלטים מ-GIS עיריית תל אביב-יפו. הכיסוי עשוי להיות חלקי או לא עדכני. תמיד ודאו את מיקום המקלטים בשטח ופעלו לפי הנחיות פיקוד העורף בחירום.',
-    emptyText: 'הזינו נקודת התחלה ויעד בתל אביב.<br/>האפליקציה תמצא מסלול הליכה שישמור אתכם בטווח מקלט בכל רגע.',
+    safetyNoticeText: 'נתוני המקלטים ממקורות GIS עירוניים. הכיסוי עשוי להיות חלקי או לא עדכני. תמיד ודאו את מיקום המקלטים בשטח ופעלו לפי הנחיות פיקוד העורף בחירום.',
+    emptyText: 'הזינו נקודת התחלה ויעד בישראל.<br/>האפליקציה תמצא מסלול הליכה שישמור אתכם בטווח מקלט בכל רגע.',
     legend: 'מקרא',
     legStart: 'נקודת התחלה',
     legEnd: 'נקודת סיום',
@@ -915,7 +915,7 @@ const STRINGS = {
     statusConfigErr: 'לא ניתן לטעון הגדרות API. האם GOOGLE_MAPS_API_KEY מוגדר?',
     statusLoadingMaps: 'טוען מפות גוגל…',
     statusGettingRoute: 'מחשב מסלול הליכה…',
-    statusFetchingShelters: 'מאתר מקלטים מעיריית תל אביב…',
+    statusFetchingShelters: (city) => `מאתר מקלטים מ${city}…`,
     statusFoundShelters: (n, tgt) => `נמצאו ${n} מקלטים. מייעל לכיסוי ${tgt}%…`,
     statusRoutingWaypoints: (iter, n) => `איטרציה ${iter}: מתווה מסלול דרך ${n} מקלטים…`,
     statusBestAchievable: (pct, tgt) => `מיטבי אפשרי: ${pct}% (יעד: ${tgt}%). גררו את המסלול לשיפור.`,
@@ -1279,8 +1279,231 @@ function populateBottomSheet() {
 // Legacy toggle (not used on mobile anymore)
 function toggleSidebar() {}
 
-// Tel Aviv Municipality ArcGIS endpoint for shelter layer 592
-const TLV_GIS_BASE = 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/WM/IView2WM/MapServer/592/query';
+// ═══════════════════════════════════════════════════════
+//  MULTI-CITY SHELTER GIS CONFIGURATION
+// ═══════════════════════════════════════════════════════
+const CITY_CONFIGS = [
+  {
+    id: 'tel-aviv',
+    name: 'Tel Aviv-Yafo',
+    nameHe: 'תל אביב-יפו',
+    center: { lat: 32.08, lng: 34.78 },
+    queryUrl: 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/WM/IView2WM/MapServer/592/query',
+    outFields: ['oid_mitkan','ms_miklat','t_sug','Full_Address','shem_rechov_eng','shetach_mr','t_sinon','hearot','lon','lat','pail','opening_times','is_open','miklat_mungash','shem'],
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = a.lat || g.y, lon = a.lon || g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `tlv-${a.oid_mitkan}`, ms_miklat: a.ms_miklat, lat, lon,
+        name: a.shem || a.t_sug || 'מקלט ציבורי', type: a.t_sug || '',
+        addr: a.Full_Address || '', addrEng: (a.shem_rechov_eng || '').trim(),
+        area: a.shetach_mr || 0, filtration: a.t_sinon || '', notes: a.hearot || '',
+        status: a.pail || '', openingTimes: a.opening_times || '', isOpen: a.is_open || '',
+        accessible: (a.miklat_mungash || '').trim(),
+      };
+    },
+  },
+  {
+    id: 'beer-sheva',
+    name: "Be'er Sheva",
+    nameHe: 'באר שבע',
+    center: { lat: 31.25, lng: 34.79 },
+    queryUrl: 'https://opendatagis.br7.org.il/arcgis/rest/services/Hosted/shelters/FeatureServer/0/query',
+    outFields: ['*'],
+    useProxy: true, // SSL cert may be expired
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `bs-${a.OBJECTID || a.FID}`, lat, lon,
+        name: a.Name || a.name || 'מקלט ציבורי', type: a.Type || a.type || '',
+        addr: a.Address || a.address || '', addrEng: '',
+        area: 0, filtration: '', notes: '', status: '', accessible: '',
+      };
+    },
+  },
+  {
+    id: 'haifa',
+    name: 'Haifa',
+    nameHe: 'חיפה',
+    center: { lat: 32.79, lng: 34.99 },
+    queryUrl: 'https://services9.arcgis.com/tfeLX7LFVABzD11G/arcgis/rest/services/מרחבים/FeatureServer/0/query',
+    outFields: ['*'],
+    inSR: '2039',
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `haifa-${a.OBJECTID}`, lat, lon,
+        name: a.PlaceName || 'מרחב מוגן', type: a.SUG || '',
+        addr: a.Address || '', addrEng: '',
+        area: a.KIBOLET || 0, filtration: '', notes: a.dothliti || '',
+        status: a.Activated || '', accessible: a.Accessable || '',
+      };
+    },
+  },
+  {
+    id: 'nahariya',
+    name: 'Nahariya',
+    nameHe: 'נהריה',
+    center: { lat: 33.01, lng: 35.09 },
+    queryUrl: 'https://services-eu1.arcgis.com/mFG6VsJiT6hDsVLu/arcgis/rest/services/נהריה_מקלטים_ציבוריים/FeatureServer/0/query',
+    outFields: ['*'],
+    inSR: '2039',
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `nah-${a.OBJECTID || a.FID}`, lat, lon,
+        name: a.FNAME || 'מקלט ציבורי', type: '', addr: a.LATIN_NAME || '', addrEng: a.LATIN_NAME || '',
+        area: 0, filtration: '', notes: '', status: '', accessible: '',
+      };
+    },
+  },
+  {
+    id: 'ashkelon',
+    name: 'Ashkelon',
+    nameHe: 'אשקלון',
+    center: { lat: 31.67, lng: 34.57 },
+    queryUrl: 'https://services2.arcgis.com/5gNmRQS5QY72VLq4/arcgis/rest/services/PUBLIC_SHELTER/FeatureServer/0/query',
+    outFields: ['*'],
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `ash-${a.OBJECTID || a.FID}`, lat, lon,
+        name: a.NAME_HEB || a.NAME_ENG || 'מקלט ציבורי', type: a.סוג_ה || '',
+        addr: a.כתובת || '', addrEng: a.NAME_ENG || '',
+        area: a.גודל_ || 0, filtration: '', notes: a.ליד || '',
+        status: a.מצב || '', accessible: '',
+      };
+    },
+  },
+  {
+    id: 'modiin',
+    name: "Modi'in",
+    nameHe: 'מודיעין',
+    center: { lat: 31.89, lng: 35.01 },
+    queryUrl: 'https://webgis.modiin.muni.il/arcgis/rest/services/GeoShelter102023/FeatureServer/0/query',
+    outFields: ['*'],
+    inSR: '2039',
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `mod-${a.OBJECTID}`, lat, lon,
+        name: a.Place || a.NUMBER || 'מקלט ציבורי', type: '',
+        addr: a.Place || '', addrEng: '',
+        area: 0, filtration: '', notes: '', status: '', accessible: '',
+      };
+    },
+  },
+  {
+    id: 'petach-tikva',
+    name: 'Petach Tikva',
+    nameHe: 'פתח תקווה',
+    center: { lat: 32.09, lng: 34.88 },
+    queryUrl: 'https://services9.arcgis.com/tfeLX7LFVABzD11G/arcgis/rest/services/מקלטים_ומחסות_לאגול/FeatureServer/179/query',
+    outFields: ['*'],
+    inSR: '2039',
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `pt-${a.OBJECTID}`, lat, lon,
+        name: a.PlaceName || 'מקלט', type: a.SUG || '',
+        addr: a.Address || '', addrEng: '',
+        area: a.KIBOLET || 0, filtration: '', notes: '',
+        status: a.Activated || '', accessible: a.Accessable || '',
+      };
+    },
+  },
+  {
+    id: 'jerusalem',
+    name: 'Jerusalem',
+    nameHe: 'ירושלים',
+    center: { lat: 31.77, lng: 35.21 },
+    queryUrl: 'https://gisviewer.jerusalem.muni.il/arcgis/rest/services/BaseLayers/MapServer/91/query',
+    outFields: ['*'],
+    useProxy: true,
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `jer-${a.OBJECTID}`, lat, lon,
+        name: 'מקלט ציבורי', type: '', addr: '', addrEng: '',
+        area: 0, filtration: '', notes: '',
+        status: '', accessible: '', ms_miklat: a.MIS_MIKLAT || '',
+      };
+    },
+  },
+  {
+    id: 'kfar-saba',
+    name: 'Kfar Saba',
+    nameHe: 'כפר סבא',
+    center: { lat: 32.18, lng: 34.91 },
+    queryUrl: 'https://services2.arcgis.com/CrAWtmFzBf9b3nM0/arcgis/rest/services/HlsFacilities/FeatureServer/0/query',
+    outFields: ['*'],
+    inSR: '2039',
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `ks-${a.OBJECTID}`, lat, lon,
+        name: a.NAME || 'מקלט ציבורי', type: a.SUG || '',
+        addr: a.STR_NAME ? `${a.STR_NAME} ${a.NUM || ''}`.trim() : '',
+        addrEng: '', area: a.AREA1 || 0, filtration: '', notes: a.Remark || '',
+        status: '', accessible: '', capacity: a.PEOPLE || 0,
+      };
+    },
+  },
+  {
+    id: 'nes-ziona',
+    name: 'Nes Ziona',
+    nameHe: 'נס ציונה',
+    center: { lat: 31.93, lng: 34.80 },
+    queryUrl: 'https://services-eu1.arcgis.com/1SaThKhnIOL6Cfhz/arcgis/rest/services/miklatim/FeatureServer/0/query',
+    outFields: ['*'],
+    parseFeat: (feat) => {
+      const a = feat.attributes, g = feat.geometry;
+      const lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: `nz-${a.OBJECTID || a.FID}`, lat, lon,
+        name: a.Name || a.name || 'מקלט ציבורי', type: '',
+        addr: a.Address || a.address || '', addrEng: '',
+        area: 0, filtration: '', notes: '', status: '', accessible: '',
+      };
+    },
+  },
+];
+
+// Detect which city config to use based on route midpoint
+let detectedCity = null;
+
+function detectCity(routePath) {
+  if (!routePath || !routePath.length) return CITY_CONFIGS[0];
+  const mid = routePath[Math.floor(routePath.length / 2)];
+  const midLat = mid.lat(), midLng = mid.lng();
+
+  let best = null, bestDist = Infinity;
+  for (const cfg of CITY_CONFIGS) {
+    const d = Math.sqrt(
+      Math.pow(midLat - cfg.center.lat, 2) + Math.pow(midLng - cfg.center.lng, 2)
+    );
+    if (d < bestDist) { bestDist = d; best = cfg; }
+  }
+  return best;
+}
 
 // Walking-distance correction factor: in urban grids, walking distance
 // is typically ~1.3× the straight-line distance.
@@ -1305,8 +1528,8 @@ function loadMaps(key) {
 
 function initMap() {
   map = new google.maps.Map(document.getElementById('map'), {
-    center: { lat: 32.08, lng: 34.78 },
-    zoom: 13,
+    center: { lat: 31.75, lng: 34.85 },
+    zoom: 8,
     disableDefaultUI: false,
     mapTypeControl: false,
     streetViewControl: false,
@@ -1395,10 +1618,17 @@ async function run() {
     const directRoute = await getRoute(orig, dest);
     if (!directRoute) return;
 
-    // 2. Fetch shelters from Tel Aviv Municipality GIS
-    setStatus(t('statusFetchingShelters'), 'info');
+    // 2. Fetch shelters from detected city's GIS
     const bbox = getPathBbox(directRoute.path, 0.012);
-    const shelters = await fetchTLVShelters(bbox);
+    const city = detectCity(directRoute.path);
+    const cityName = currentLang === 'he' ? city.nameHe : city.name;
+    setStatus(t('statusFetchingShelters')(cityName), 'info');
+    const shelters = await fetchShelters(bbox, directRoute.path);
+    // Update data source attribution
+    const dataSrcEl = document.getElementById('dataSrc');
+    if (dataSrcEl && detectedCity) {
+      dataSrcEl.innerHTML = `Data: ${detectedCity.nameHe} — GIS`;
+    }
     setStatus(t('statusFoundShelters')(shelters.length, coverageTarget), 'info');
 
     // 3. Build shelter-aware route with coverage target
@@ -1494,11 +1724,13 @@ function getRoute(origin, destination, waypoints) {
 }
 
 // ═══════════════════════════════════════════════════════
-//  STEP 2: FETCH SHELTERS — Tel Aviv Municipality GIS
-//  ArcGIS REST API, layer 592, spatial query with
-//  route bounding box envelope in EPSG:4326 (outSR=4326)
+//  STEP 2: FETCH SHELTERS — Multi-city ArcGIS REST API
+//  Detects city from route path, queries the appropriate
+//  GIS endpoint with bounding box envelope
 // ═══════════════════════════════════════════════════════
-async function fetchTLVShelters(bbox) {
+async function fetchShelters(bbox, routePath) {
+  const city = detectCity(routePath);
+  detectedCity = city;
   const shelters = [];
 
   try {
@@ -1508,54 +1740,36 @@ async function fetchTLVShelters(bbox) {
       geometryType: 'esriGeometryEnvelope',
       inSR: '4326',
       spatialRel: 'esriSpatialRelIntersects',
-      outFields: [
-        'oid_mitkan','ms_miklat','t_sug','Full_Address',
-        'shem_rechov_eng','shetach_mr','t_sinon','hearot',
-        'lon','lat','pail','opening_times','is_open',
-        'miklat_mungash','shem'
-      ].join(','),
+      outFields: city.outFields.join(','),
       outSR: '4326',
       returnGeometry: 'true',
       f: 'json',
     });
 
-    const resp = await fetch(`${TLV_GIS_BASE}?${params}`);
+    let fetchUrl = `${city.queryUrl}?${params}`;
+    if (city.useProxy) {
+      fetchUrl = `/api/shelters-proxy?url=${encodeURIComponent(fetchUrl)}`;
+    }
+
+    const resp = await fetch(fetchUrl);
     const data = await resp.json();
 
     if (data.error) {
-      console.warn('TLV GIS error:', data.error);
+      console.warn(`${city.id} GIS error:`, data.error);
       return shelters;
     }
 
     for (const feat of (data.features || [])) {
-      const a = feat.attributes;
-      const g = feat.geometry;
-      // Prefer lon/lat from attributes (more precise), fall back to geometry
-      const lat = a.lat || g.y;
-      const lon = a.lon || g.x;
-      if (!lat || !lon) continue;
-
+      const parsed = city.parseFeat(feat);
+      if (!parsed) continue;
       shelters.push({
-        id: `tlv-${a.oid_mitkan}`,
-        ms_miklat: a.ms_miklat,
-        lat, lon,
-        name: a.shem || a.t_sug || 'מקלט ציבורי',
-        type: a.t_sug || '',
-        addr: a.Full_Address || '',
-        addrEng: (a.shem_rechov_eng || '').trim(),
-        area: a.shetach_mr || 0,
-        filtration: a.t_sinon || '',
-        notes: a.hearot || '',
-        status: a.pail || '',
-        openingTimes: a.opening_times || '',
-        isOpen: a.is_open || '',
-        accessible: (a.miklat_mungash || '').trim(),
-        source: 'tlv-gis',
-        location: new google.maps.LatLng(lat, lon),
+        ...parsed,
+        source: city.id,
+        location: new google.maps.LatLng(parsed.lat, parsed.lon),
       });
     }
   } catch(e) {
-    console.warn('TLV GIS fetch failed', e);
+    console.warn(`${city.id} GIS fetch failed`, e);
   }
 
   return shelters;
@@ -1943,7 +2157,7 @@ function drawShelterMarkers(shelters, usedShelters) {
           <textarea placeholder="${t('phReview')}" maxlength="500"></textarea>
           <button onclick="submitReview('${s.id}', this)">${t('submitBtn')}</button>
         </div>
-        <div style="margin-top:4px;color:#aaa;font-size:9px">עיריית תל אביב-יפו</div>
+        <div style="margin-top:4px;color:#aaa;font-size:9px">${detectedCity ? detectedCity.nameHe : ''}</div>
       </div>`
     });
     marker.addListener('click', () => {
@@ -2366,7 +2580,7 @@ window.addEventListener('resize', () => {
 // Init language from saved preference
 setLang(localStorage.getItem('miklat-lang') || 'en');
 
-// Load map eagerly so user sees Tel Aviv immediately
+// Load map eagerly so user sees Israel immediately
 (async function preloadMap() {
   try {
     const res = await fetch('/api/config');
