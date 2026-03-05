@@ -12,6 +12,7 @@ App.geoLocations = { origin: null, dest: null };
 App.draggableRenderer = null;
 App.shelterListUpdateTimer = null;
 App.detectedCity = null;
+App.detectedCities = [];
 
 // Global aliases for HTML onclick handlers
 window.run = function() { App.run(); };
@@ -180,13 +181,13 @@ App.run = async function() {
     if (runId !== App._runId) return;
 
     var bbox = App.getPathBbox(directRoute.path, 0.012);
-    var city = App.detectCity(directRoute.path);
-    var cityName = App.currentLang === 'he' ? city.nameHe : city.name;
-    App.setStatus(App.t('statusFetchingShelters')(cityName), 'info');
+    var cities = App.detectCities(directRoute.path);
+    var cityNames = cities.map(function(c) { return App.currentLang === 'he' ? c.nameHe : c.name; });
+    App.setStatus(App.t('statusFetchingShelters')(cityNames.join(', ')), 'info');
     var shelters = await App.fetchShelters(bbox, directRoute.path);
     var dataSrcEl = document.getElementById('dataSrc');
-    if (dataSrcEl && App.detectedCity) {
-      dataSrcEl.innerHTML = 'Data: ' + App.detectedCity.nameHe + ' \u2014 GIS';
+    if (dataSrcEl && App.detectedCities && App.detectedCities.length) {
+      dataSrcEl.innerHTML = 'Data: ' + App.detectedCities.map(function(c) { return c.nameHe; }).join(', ') + ' \u2014 GIS';
     }
     App.setStatus(App.t('statusFoundShelters')(shelters.length, coverageTarget), 'info');
 
