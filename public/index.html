@@ -155,6 +155,36 @@
     }
     .radius-row label { font-size: 11px; color: var(--muted); flex: 1; }
 
+    /* ── SHELTER RADIUS TOGGLE ── */
+    .toggle-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px;
+    }
+    .toggle-row label { font-size: 11px; color: var(--muted); flex: 1; cursor: pointer; }
+    .toggle-switch {
+      position: relative; display: inline-block;
+      width: 36px; height: 20px; flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--border, #ccc); border-radius: 10px;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 14px; height: 14px; left: 3px; bottom: 3px;
+      background: white; border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-slider {
+      background: var(--green);
+    }
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(16px);
+    }
+
     /* ── COVERAGE TARGET ── */
     .target-row {
       display: flex; align-items: center; gap: 8px;
@@ -613,6 +643,14 @@
       </div>
       <div class="target-hint" data-i18n="targetHint">Higher targets may produce longer, more circuitous routes.</div>
 
+      <div class="toggle-row">
+        <label for="showRadius" data-i18n="showRadius">Show shelter radius</label>
+        <div class="toggle-switch">
+          <input type="checkbox" id="showRadius"/>
+          <span class="toggle-slider"></span>
+        </div>
+      </div>
+
       <button class="btn" id="goBtn" onclick="run()">
         <span class="bt" data-i18n="btnGo">PLAN SAFE ROUTE</span>
         <div class="sp"></div>
@@ -737,6 +775,13 @@
           <input type="range" class="target-slider" id="mobileCoverageTarget" min="50" max="100" step="5" value="80"/>
           <span class="target-val" id="mobileCoverageTargetVal" style="font-size:11px">80%</span>
         </div>
+        <div class="toggle-row" style="margin-top:4px">
+          <label for="mobileShowRadius" style="font-size:10px" data-i18n="showRadius">Show shelter radius</label>
+          <div class="toggle-switch">
+            <input type="checkbox" id="mobileShowRadius"/>
+            <span class="toggle-slider"></span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -806,6 +851,7 @@ const STRINGS = {
     legGap: 'Coverage gap',
     legRadius: 'Shelter radius',
     legDrag: '✋ Drag route to adjust',
+    showRadius: 'Show shelter radius',
     statusEnterBoth: 'Enter both a start and end point.',
     statusLoadingConfig: 'Loading configuration…',
     statusConfigErr: 'Could not load API config. Is GOOGLE_MAPS_API_KEY set in Vercel?',
@@ -863,6 +909,7 @@ const STRINGS = {
     legGap: 'פער כיסוי',
     legRadius: 'רדיוס מקלט',
     legDrag: '✋ גררו מסלול להתאמה',
+    showRadius: 'הצג רדיוס מקלט',
     statusEnterBoth: 'הזינו נקודת התחלה ויעד.',
     statusLoadingConfig: 'טוען הגדרות…',
     statusConfigErr: 'לא ניתן לטעון הגדרות API. האם GOOGLE_MAPS_API_KEY מוגדר?',
@@ -920,6 +967,7 @@ function setLang(lang) {
 let map, dirSvc, dirRenderer;
 let mapsReady = false;
 let mapObjects = [];
+let shelterCircles = [];
 let shelterRatings = {};
 let geoLocations = { origin: null, dest: null };
 
@@ -1022,6 +1070,25 @@ document.addEventListener('DOMContentLoaded', () => {
       // Sync to desktop
       if (ct) ct.value = mct.value;
       if (ctv) ctv.textContent = mct.value + '%';
+    });
+  }
+
+  // Shelter radius toggle sync
+  function toggleShelterCircles(visible) {
+    shelterCircles.forEach(c => c.setMap(visible ? map : null));
+  }
+  const srToggle = document.getElementById('showRadius');
+  const mSrToggle = document.getElementById('mobileShowRadius');
+  if (srToggle) {
+    srToggle.addEventListener('change', () => {
+      if (mSrToggle) mSrToggle.checked = srToggle.checked;
+      toggleShelterCircles(srToggle.checked);
+    });
+  }
+  if (mSrToggle) {
+    mSrToggle.addEventListener('change', () => {
+      if (srToggle) srToggle.checked = mSrToggle.checked;
+      toggleShelterCircles(mSrToggle.checked);
     });
   }
 });
@@ -1813,14 +1880,19 @@ function drawRoute(coveredSegs, gapSegs) {
 }
 
 function drawShelterCircles(shelters, radius) {
+  // Clear any existing shelter circles
+  shelterCircles.forEach(c => c.setMap(null));
+  shelterCircles = [];
+  const visible = document.getElementById('showRadius').checked;
   for (const s of shelters) {
     const c = new google.maps.Circle({
-      center: s.location, radius, map,
+      center: s.location, radius,
+      map: visible ? map : null,
       fillColor: '#18C96A', fillOpacity: 0.10,
       strokeColor: '#18C96A', strokeOpacity: 0.45,
       strokeWeight: 1.5, zIndex: 1,
     });
-    mapObjects.push(c);
+    shelterCircles.push(c);
   }
 }
 
@@ -2164,6 +2236,8 @@ function clearAll() {
     else if (o.close) o.close();
   });
   mapObjects = [];
+  shelterCircles.forEach(c => c.setMap(null));
+  shelterCircles = [];
   shelterRatings = {};
   if (dirRenderer) dirRenderer.setDirections({ routes: [] });
   if (draggableRenderer) {
