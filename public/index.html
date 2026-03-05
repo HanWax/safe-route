@@ -149,6 +149,23 @@
     .loc-btn.active { color: var(--blue); }
     .loc-btn svg { width: 16px; height: 16px; fill: currentColor; }
 
+    /* ── SWAP BUTTON ── */
+    .fields-wrap {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .fields-inputs { flex: 1; min-width: 0; }
+    .swap-btn {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      cursor: pointer; padding: 6px; color: var(--muted);
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .swap-btn:hover { color: var(--blue); border-color: var(--blue); background: rgba(0,122,255,0.04); }
+    .swap-btn:active { background: rgba(0,122,255,0.10); }
+    .swap-btn svg { width: 20px; height: 20px; fill: currentColor; }
+    body.he .swap-btn { order: -1; }
+
     .radius-row {
       display: flex; align-items: center; gap: 8px;
       margin-top: 8px;
@@ -506,6 +523,36 @@
     }
     body.he .mobile-search-row .loc-btn { right: auto; left: 4px; }
     body.he .mobile-search-row input { padding: 9px 10px 9px 32px; }
+
+    /* ── MOBILE SWAP BUTTON ── */
+    .mobile-fields-wrap {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .mobile-fields-col {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .mobile-swap-btn {
+      padding: 8px; border-radius: 8px;
+    }
+    .mobile-swap-btn svg { width: 22px; height: 22px; }
+
+    /* ── MOBILE LOCATION CHIP ── */
+    .mobile-location-chips {
+      display: flex; gap: 6px; margin-top: 4px;
+    }
+    .location-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: none; border: 1px solid var(--border); border-radius: 16px;
+      padding: 5px 12px 5px 8px; cursor: pointer;
+      font-family: 'DM Mono', monospace; font-size: 11px;
+      color: var(--muted); transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+    .location-chip svg { fill: currentColor; flex-shrink: 0; }
+    .location-chip:hover { color: var(--blue); border-color: var(--blue); background: rgba(0,122,255,0.04); }
+    .location-chip:active { background: rgba(0,122,255,0.10); }
+    .location-chip.active { color: var(--blue); border-color: var(--blue); }
+
     .mobile-search-actions {
       display: flex; align-items: center; gap: 8px; margin-top: 8px;
     }
@@ -612,18 +659,25 @@
     <div class="sidebar-scroll">
 
       <div class="lbl" data-i18n="lblRoute">Route</div>
-      <div class="field">
-        <div class="field-dot s"></div>
-        <input type="text" id="origin" data-i18n-placeholder="phStart" placeholder="Start…" style="padding-right:32px"/>
-        <button class="loc-btn" onclick="useMyLocation('origin')" title="Use my current location">
-          <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-        </button>
-      </div>
-      <div class="field">
-        <div class="field-dot e"></div>
-        <input type="text" id="dest" data-i18n-placeholder="phDest" placeholder="Destination…" style="padding-right:32px"/>
-        <button class="loc-btn" onclick="useMyLocation('dest')" title="Use my current location">
-          <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+      <div class="fields-wrap">
+        <div class="fields-inputs">
+          <div class="field">
+            <div class="field-dot s"></div>
+            <input type="text" id="origin" data-i18n-placeholder="phStart" placeholder="Start…" style="padding-right:32px"/>
+            <button class="loc-btn" onclick="useMyLocation('origin')" title="Use my current location">
+              <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+            </button>
+          </div>
+          <div class="field">
+            <div class="field-dot e"></div>
+            <input type="text" id="dest" data-i18n-placeholder="phDest" placeholder="Destination…" style="padding-right:32px"/>
+            <button class="loc-btn" onclick="useMyLocation('dest')" title="Use my current location">
+              <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+            </button>
+          </div>
+        </div>
+        <button class="swap-btn" onclick="swapLocations()" data-i18n-title="swapTooltip" title="Swap origin and destination">
+          <svg viewBox="0 0 24 24"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg>
         </button>
       </div>
 
@@ -740,23 +794,36 @@
           </select>
         </div>
         <div class="mobile-search-inputs">
-          <div class="mobile-search-row">
-            <div class="field-dot s"></div>
-            <div class="input-wrap">
-              <input type="text" id="mobileOrigin" data-i18n-placeholder="phStart" placeholder="Start…"/>
-              <button class="loc-btn" onclick="useMyLocation('mobileOrigin')" title="Use my current location">
-                <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-              </button>
+          <div class="mobile-fields-wrap">
+            <div class="mobile-fields-col">
+              <div class="mobile-search-row">
+                <div class="field-dot s"></div>
+                <div class="input-wrap">
+                  <input type="text" id="mobileOrigin" data-i18n-placeholder="phStart" placeholder="Start…"/>
+                  <button class="loc-btn" onclick="useMyLocation('mobileOrigin')" title="Use my current location">
+                    <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="mobile-search-row">
+                <div class="field-dot e"></div>
+                <div class="input-wrap">
+                  <input type="text" id="mobileDest" data-i18n-placeholder="phDest" placeholder="Destination…"/>
+                  <button class="loc-btn" onclick="useMyLocation('mobileDest')" title="Use my current location">
+                    <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+                  </button>
+                </div>
+              </div>
             </div>
+            <button class="swap-btn mobile-swap-btn" onclick="swapLocations()" data-i18n-title="swapTooltip" title="Swap origin and destination">
+              <svg viewBox="0 0 24 24"><path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg>
+            </button>
           </div>
-          <div class="mobile-search-row">
-            <div class="field-dot e"></div>
-            <div class="input-wrap">
-              <input type="text" id="mobileDest" data-i18n-placeholder="phDest" placeholder="Destination…"/>
-              <button class="loc-btn" onclick="useMyLocation('mobileDest')" title="Use my current location">
-                <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-              </button>
-            </div>
+          <div class="mobile-location-chips">
+            <button class="location-chip" onclick="useMyLocation('mobileOrigin')" id="mobileOriginChip">
+              <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+              <span data-i18n="useCurrentLocation">Use current location</span>
+            </button>
           </div>
         </div>
         <div class="mobile-search-actions">
@@ -875,6 +942,8 @@ const STRINGS = {
     geoNotSupported: 'Geolocation is not supported by your browser.',
     locating: 'Locating…',
     myLocation: 'My Location',
+    swapTooltip: 'Swap origin and destination',
+    useCurrentLocation: 'Use current location',
   },
   he: {
     headerTag: 'הליכה מוגנת · תל אביב-יפו',
@@ -933,6 +1002,8 @@ const STRINGS = {
     geoNotSupported: 'הדפדפן שלך אינו תומך במיקום.',
     locating: 'מאתר…',
     myLocation: 'המיקום שלי',
+    swapTooltip: 'החלף מוצא ויעד',
+    useCurrentLocation: 'השתמש במיקום הנוכחי',
   }
 };
 
@@ -956,6 +1027,10 @@ function setLang(lang) {
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const val = t(el.dataset.i18nPlaceholder);
     if (typeof val === 'string') el.placeholder = val;
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const val = t(el.dataset.i18nTitle);
+    if (typeof val === 'string') el.title = val;
   });
   localStorage.setItem('miklat-lang', lang);
   mapsReady = false;
@@ -1007,6 +1082,11 @@ function useMyLocation(fieldId) {
         const pBtn = paired.parentElement.querySelector('.loc-btn');
         if (pBtn) pBtn.classList.add('active');
       }
+      // Update location chip if origin
+      if (canonicalId === 'origin') {
+        const chip = document.getElementById('mobileOriginChip');
+        if (chip) chip.classList.add('active');
+      }
     },
     (err) => {
       input.value = '';
@@ -1018,6 +1098,11 @@ function useMyLocation(fieldId) {
         const pBtn = paired.parentElement.querySelector('.loc-btn');
         if (pBtn) pBtn.classList.remove('active');
       }
+      // Update location chip if origin
+      if (canonicalId === 'origin') {
+        const chip = document.getElementById('mobileOriginChip');
+        if (chip) chip.classList.remove('active');
+      }
       const msgs = {
         1: 'Location access denied. Please allow location access in your browser settings.',
         2: 'Could not determine your location. Please try again.',
@@ -1027,6 +1112,54 @@ function useMyLocation(fieldId) {
     },
     { enableHighAccuracy: true, timeout: 10000 }
   );
+}
+
+// ═══════════════════════════════════════════════════════
+//  SWAP ORIGIN & DESTINATION
+// ═══════════════════════════════════════════════════════
+function swapLocations() {
+  const originEl = document.getElementById('origin');
+  const destEl = document.getElementById('dest');
+  const mOriginEl = document.getElementById('mobileOrigin');
+  const mDestEl = document.getElementById('mobileDest');
+
+  // Swap text values
+  const tmpVal = originEl.value;
+  originEl.value = destEl.value;
+  destEl.value = tmpVal;
+  if (mOriginEl && mDestEl) {
+    mOriginEl.value = originEl.value;
+    mDestEl.value = destEl.value;
+  }
+
+  // Swap geolocation data
+  const tmpGeo = geoLocations.origin;
+  geoLocations.origin = geoLocations.dest;
+  geoLocations.dest = tmpGeo;
+
+  // Swap loc-btn active states (desktop)
+  const originBtn = originEl.parentElement.querySelector('.loc-btn');
+  const destBtn = destEl.parentElement.querySelector('.loc-btn');
+  if (originBtn && destBtn) {
+    const tmpActive = originBtn.classList.contains('active');
+    originBtn.classList.toggle('active', destBtn.classList.contains('active'));
+    destBtn.classList.toggle('active', tmpActive);
+  }
+
+  // Swap loc-btn active states (mobile)
+  if (mOriginEl && mDestEl) {
+    const mOriginBtn = mOriginEl.parentElement.querySelector('.loc-btn');
+    const mDestBtn = mDestEl.parentElement.querySelector('.loc-btn');
+    if (mOriginBtn && mDestBtn) {
+      const tmpActive = mOriginBtn.classList.contains('active');
+      mOriginBtn.classList.toggle('active', mDestBtn.classList.contains('active'));
+      mDestBtn.classList.toggle('active', tmpActive);
+    }
+  }
+
+  // Update location chip active state
+  const chip = document.getElementById('mobileOriginChip');
+  if (chip) chip.classList.toggle('active', !!geoLocations.origin);
 }
 
 // Clear geolocation when user types in the field
@@ -1045,6 +1178,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (pairedEl) {
         const pBtn = pairedEl.parentElement.querySelector('.loc-btn');
         if (pBtn) pBtn.classList.remove('active');
+      }
+      // Clear location chip active state
+      if (canonicalId === 'origin') {
+        const chip = document.getElementById('mobileOriginChip');
+        if (chip) chip.classList.remove('active');
       }
     });
   });
