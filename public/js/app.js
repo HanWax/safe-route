@@ -74,7 +74,7 @@ App.useMyLocation = function(fieldId) {
       if (chip) chip.classList.remove('active');
     }
     App.setStatus(App.t('geoError' + err.code) || App.t('geoErrorGeneric'), 'err');
-    if (err.code === 1) { App.watchPermissionChange(); }
+    if (err.code === 1) { App.watchPermissionChange(fieldId); }
   }
   navigator.geolocation.getCurrentPosition(
     onSuccess,
@@ -92,19 +92,19 @@ App.useMyLocation = function(fieldId) {
   );
 };
 
-App.watchPermissionChange = function() {
+App.watchPermissionChange = function(fieldId) {
   if (App._permWatcher || !navigator.permissions) return;
   navigator.permissions.query({ name: 'geolocation' }).then(function(status) {
     if (status.state === 'granted') {
-      App.setStatus(App.t('geoPermissionGranted'), 'info');
+      App.useMyLocation(fieldId);
       return;
     }
     App._permWatcher = status;
     status.onchange = function() {
       if (status.state === 'granted') {
-        App.setStatus(App.t('geoPermissionGranted'), 'info');
         status.onchange = null;
         App._permWatcher = null;
+        App.useMyLocation(fieldId);
       }
     };
   }).catch(function() {});
