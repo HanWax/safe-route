@@ -1673,7 +1673,7 @@ function loadMaps(key) {
     const s = document.createElement('script');
     s.id = '_gms';
     const mapsLang = currentLang === 'he' ? 'iw' : 'en';
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places,geometry&callback=__mapsLoaded&language=${mapsLang}`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places,geometry&callback=__mapsLoaded&language=${mapsLang}&loading=async`;
     s.onerror = () => rej(new Error('Failed to load Google Maps — check your API key and that Maps JS API + Directions API are enabled.'));
     document.head.appendChild(s);
   });
