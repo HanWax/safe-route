@@ -423,6 +423,7 @@
       position: absolute; top: 0; left: 0; right: 0;
       z-index: 50; padding: 12px 12px 0;
       pointer-events: none;
+      overflow: hidden;
     }
     .mobile-search > * { pointer-events: auto; }
     .mobile-search-card {
@@ -430,12 +431,19 @@
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.18);
       padding: 10px 12px;
+      overflow: hidden;
     }
     .mobile-search-header {
       display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+      justify-content: space-between;
     }
     .mobile-search-header .logo {
       font-size: 13px; gap: 5px;
+    }
+    .mobile-search-header .mobile-lang-sel {
+      background: var(--paper); color: var(--ink); border: 1px solid var(--border);
+      font-family: 'DM Mono', monospace; font-size: 11px; padding: 3px 6px;
+      cursor: pointer; border-radius: 4px;
     }
     .mobile-search-header .logo-shield {
       width: 20px; height: 20px; font-size: 9px;
@@ -445,27 +453,40 @@
     }
     .mobile-search-row {
       display: flex; align-items: center; gap: 8px;
+      position: relative;
     }
     .mobile-search-row .field-dot {
       position: static; transform: none;
       width: 8px; height: 8px; flex-shrink: 0;
     }
+    .mobile-search-row .input-wrap {
+      flex: 1; position: relative; min-width: 0;
+    }
     .mobile-search-row input {
-      flex: 1; border: 1px solid var(--border); background: var(--paper);
+      width: 100%; border: 1px solid var(--border); background: var(--paper);
       font-family: 'DM Mono', monospace; font-size: 13px;
-      padding: 9px 10px; border-radius: 6px; color: var(--ink); outline: none;
+      padding: 9px 32px 9px 10px; border-radius: 6px; color: var(--ink); outline: none;
     }
     .mobile-search-row input:focus { border-color: var(--blue); background: var(--white); }
     .mobile-search-row input::placeholder { color: var(--muted); }
+    .mobile-search-row .loc-btn {
+      position: absolute; right: 4px; top: 50%;
+      transform: translateY(-50%);
+      padding: 4px 6px;
+    }
+    body.he .mobile-search-row .loc-btn { right: auto; left: 4px; }
+    body.he .mobile-search-row input { padding: 9px 10px 9px 32px; }
     .mobile-search-actions {
       display: flex; align-items: center; gap: 8px; margin-top: 8px;
     }
     .mobile-search-actions select {
-      font-size: 12px; border-radius: 6px; padding: 6px 8px; flex: 1;
+      font-size: 12px; border-radius: 6px; padding: 6px 8px; flex: 0 1 auto;
       border: 1px solid var(--border); background: var(--paper);
+      min-width: 0; max-width: 40%;
     }
     .mobile-search-actions .btn {
       margin-top: 0; flex: 1; padding: 9px; font-size: 12px; border-radius: 6px;
+      min-width: 0; white-space: nowrap; overflow: hidden;
     }
 
     /* ── MOBILE: BOTTOM SHEET ── */
@@ -673,15 +694,29 @@
             <div class="logo-shield">🛡</div>
             Miklat
           </div>
+          <select class="mobile-lang-sel" id="mobileLangSel" onchange="setLang(this.value)">
+            <option value="en">EN</option>
+            <option value="he">עב</option>
+          </select>
         </div>
         <div class="mobile-search-inputs">
           <div class="mobile-search-row">
             <div class="field-dot s"></div>
-            <input type="text" id="mobileOrigin" data-i18n-placeholder="phStart" placeholder="Start…"/>
+            <div class="input-wrap">
+              <input type="text" id="mobileOrigin" data-i18n-placeholder="phStart" placeholder="Start…"/>
+              <button class="loc-btn" onclick="useMyLocation('mobileOrigin')" title="Use my current location">
+                <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+              </button>
+            </div>
           </div>
           <div class="mobile-search-row">
             <div class="field-dot e"></div>
-            <input type="text" id="mobileDest" data-i18n-placeholder="phDest" placeholder="Destination…"/>
+            <div class="input-wrap">
+              <input type="text" id="mobileDest" data-i18n-placeholder="phDest" placeholder="Destination…"/>
+              <button class="loc-btn" onclick="useMyLocation('mobileDest')" title="Use my current location">
+                <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+              </button>
+            </div>
           </div>
         </div>
         <div class="mobile-search-actions">
@@ -861,6 +896,8 @@ function t(key) {
 function setLang(lang) {
   currentLang = lang;
   document.getElementById('langSel').value = lang;
+  const mobileLang = document.getElementById('mobileLangSel');
+  if (mobileLang) mobileLang.value = lang;
   document.documentElement.lang = lang;
   document.body.classList.toggle('he', lang === 'he');
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -895,25 +932,42 @@ function useMyLocation(fieldId) {
   if (!navigator.geolocation) {
     return setStatus(t('geoNotSupported'), 'err');
   }
+  // Map mobile IDs to canonical keys and sync both inputs
+  const mobileMap = { mobileOrigin: 'origin', mobileDest: 'dest' };
+  const canonicalId = mobileMap[fieldId] || fieldId;
+  const pairedId = mobileMap[fieldId] ? fieldId : (canonicalId === 'origin' ? 'mobileOrigin' : 'mobileDest');
+
   const input = document.getElementById(fieldId);
+  const paired = document.getElementById(pairedId);
   const btn = input.parentElement.querySelector('.loc-btn');
   input.value = t('locating');
   input.disabled = true;
+  if (paired) { paired.value = t('locating'); }
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
-      geoLocations[fieldId] = { lat, lng };
+      geoLocations[canonicalId] = { lat, lng };
       input.value = t('myLocation');
       input.disabled = false;
       btn.classList.add('active');
+      if (paired) {
+        paired.value = t('myLocation');
+        const pBtn = paired.parentElement.querySelector('.loc-btn');
+        if (pBtn) pBtn.classList.add('active');
+      }
     },
     (err) => {
       input.value = '';
       input.disabled = false;
-      geoLocations[fieldId] = null;
+      geoLocations[canonicalId] = null;
       btn.classList.remove('active');
+      if (paired) {
+        paired.value = '';
+        const pBtn = paired.parentElement.querySelector('.loc-btn');
+        if (pBtn) pBtn.classList.remove('active');
+      }
       const msgs = {
         1: 'Location access denied. Please allow location access in your browser settings.',
         2: 'Could not determine your location. Please try again.',
@@ -927,10 +981,21 @@ function useMyLocation(fieldId) {
 
 // Clear geolocation when user types in the field
 document.addEventListener('DOMContentLoaded', () => {
-  ['origin', 'dest'].forEach(id => {
-    document.getElementById(id).addEventListener('input', () => {
-      geoLocations[id] = null;
-      document.getElementById(id).parentElement.querySelector('.loc-btn').classList.remove('active');
+  const fieldPairs = { origin: 'mobileOrigin', dest: 'mobileDest', mobileOrigin: 'origin', mobileDest: 'dest' };
+  ['origin', 'dest', 'mobileOrigin', 'mobileDest'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const canonicalId = { mobileOrigin: 'origin', mobileDest: 'dest' }[id] || id;
+    el.addEventListener('input', () => {
+      geoLocations[canonicalId] = null;
+      const btn = el.parentElement.querySelector('.loc-btn');
+      if (btn) btn.classList.remove('active');
+      // Sync to paired field
+      const pairedEl = document.getElementById(fieldPairs[id]);
+      if (pairedEl) {
+        const pBtn = pairedEl.parentElement.querySelector('.loc-btn');
+        if (pBtn) pBtn.classList.remove('active');
+      }
     });
   });
 
@@ -2221,6 +2286,19 @@ window.addEventListener('resize', () => {
 
 // Init language from saved preference
 setLang(localStorage.getItem('miklat-lang') || 'en');
+
+// Load map eagerly so user sees Tel Aviv immediately
+(async function preloadMap() {
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) return;
+    const { key } = await res.json();
+    await loadMaps(key);
+    initMap();
+  } catch (e) {
+    // Map will load on first route request instead
+  }
+})();
 </script>
 </body>
 </html>
