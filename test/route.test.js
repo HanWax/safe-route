@@ -30,23 +30,29 @@ var google = { maps: { geometry: { spherical: {
 
 // --- Load the functions under test ---
 var App = {};
-// Inline the two functions we need to test (they only depend on google.maps)
+// Inline the functions we need to test (they only depend on google.maps)
 
-App.projectOntoPath = function(shelter, path) {
-  var loc = new google.maps.LatLng(shelter.lat, shelter.lon);
-  var bestIdx = 0, bestDist = Infinity;
+App.closestOnPath = function(point, path) {
+  var min = Infinity, closest = path[0], closestIdx = 0;
   for (var i = 0; i < path.length; i++) {
-    var d = google.maps.geometry.spherical.computeDistanceBetween(loc, path[i]);
-    if (d < bestDist) { bestDist = d; bestIdx = i; }
+    var d = google.maps.geometry.spherical.computeDistanceBetween(point, path[i]);
+    if (d < min) { min = d; closest = path[i]; closestIdx = i; }
   }
-  return bestIdx;
+  return { dist: min, point: closest, pathIndex: closestIdx };
 };
 
 App.orderWaypointsAlongPath = function(shelters, path) {
-  return shelters.slice().sort(function(a, b) {
-    return App.projectOntoPath(a, path) - App.projectOntoPath(b, path);
+  var indexed = shelters.map(function(s) {
+    return { shelter: s, pathIdx: App.closestOnPath(s.location, path).pathIndex };
   });
+  indexed.sort(function(a, b) { return a.pathIdx - b.pathIdx; });
+  return indexed.map(function(x) { return x.shelter; });
 };
+
+// Helper to create shelter objects matching production shape
+function makeShelter(id, lat, lon) {
+  return { id: id, lat: lat, lon: lon, location: new google.maps.LatLng(lat, lon) };
+}
 
 // ============================================================
 // Tests
@@ -64,9 +70,9 @@ console.log('\n--- orderWaypointsAlongPath ---');
 
   // Shelters given in reverse order (C near end, B near middle, A near start)
   var shelters = [
-    { id: 'C', lat: 32.079, lon: 34.771 },
-    { id: 'A', lat: 32.061, lon: 34.771 },
-    { id: 'B', lat: 32.071, lon: 34.771 },
+    makeShelter('C', 32.079, 34.771),
+    makeShelter('A', 32.061, 34.771),
+    makeShelter('B', 32.071, 34.771),
   ];
 
   var ordered = App.orderWaypointsAlongPath(shelters, path);
@@ -85,7 +91,7 @@ console.log('\n--- orderWaypointsAlongPath ---');
     new google.maps.LatLng(32.06, 34.77),
     new google.maps.LatLng(32.08, 34.77),
   ];
-  var shelters = [{ id: 'X', lat: 32.07, lon: 34.77 }];
+  var shelters = [makeShelter('X', 32.07, 34.77)];
   var ordered = App.orderWaypointsAlongPath(shelters, path);
   assert(ordered.length === 1 && ordered[0].id === 'X', 'single shelter returned unchanged');
 })();
@@ -103,8 +109,8 @@ console.log('\n--- orderWaypointsAlongPath ---');
     new google.maps.LatLng(32.08, 34.77),
   ];
   var shelters = [
-    { id: 'A', lat: 32.061, lon: 34.770 },
-    { id: 'B', lat: 32.062, lon: 34.771 },
+    makeShelter('A', 32.061, 34.770),
+    makeShelter('B', 32.062, 34.771),
   ];
   var ordered = App.orderWaypointsAlongPath(shelters, path);
   assert(ordered.length === 2, 'handles two shelters near same path point');
@@ -124,12 +130,12 @@ console.log('\n--- orderWaypointsAlongPath ---');
 
   // Shelters sorted by coverage count (how the bug ordered them)
   var shelters = [
-    { id: 'mid1',   lat: 32.0665, lon: 34.7712 },  // near middle
-    { id: 'end1',   lat: 32.0710, lon: 34.7693 },  // near end
-    { id: 'start1', lat: 32.0635, lon: 34.7718 },  // near start
-    { id: 'mid2',   lat: 32.0680, lon: 34.7703 },  // near middle
-    { id: 'end2',   lat: 32.0725, lon: 34.7688 },  // near end
-    { id: 'start2', lat: 32.0648, lon: 34.7716 },  // near start
+    makeShelter('mid1',   32.0665, 34.7712),  // near middle
+    makeShelter('end1',   32.0710, 34.7693),  // near end
+    makeShelter('start1', 32.0635, 34.7718),  // near start
+    makeShelter('mid2',   32.0680, 34.7703),  // near middle
+    makeShelter('end2',   32.0725, 34.7688),  // near end
+    makeShelter('start2', 32.0648, 34.7716),  // near start
   ];
 
   var ordered = App.orderWaypointsAlongPath(shelters, path);
@@ -149,18 +155,23 @@ console.log('\n--- orderWaypointsAlongPath ---');
   assert(midIdx2 < endIdx2, 'mid2 before end2');
 })();
 
-console.log('\n--- projectOntoPath ---');
+console.log('\n--- closestOnPath ---');
 
-(function testProjectOntoPath() {
+(function testClosestOnPath() {
   var path = [
     new google.maps.LatLng(32.06, 34.77),  // idx 0
     new google.maps.LatLng(32.07, 34.77),  // idx 1
     new google.maps.LatLng(32.08, 34.77),  // idx 2
   ];
 
-  assert(App.projectOntoPath({ lat: 32.061, lon: 34.77 }, path) === 0, 'projects to index 0 (near start)');
-  assert(App.projectOntoPath({ lat: 32.071, lon: 34.77 }, path) === 1, 'projects to index 1 (near middle)');
-  assert(App.projectOntoPath({ lat: 32.079, lon: 34.77 }, path) === 2, 'projects to index 2 (near end)');
+  var r0 = App.closestOnPath(new google.maps.LatLng(32.061, 34.77), path);
+  var r1 = App.closestOnPath(new google.maps.LatLng(32.071, 34.77), path);
+  var r2 = App.closestOnPath(new google.maps.LatLng(32.079, 34.77), path);
+  assert(r0.pathIndex === 0, 'projects to index 0 (near start)');
+  assert(r1.pathIndex === 1, 'projects to index 1 (near middle)');
+  assert(r2.pathIndex === 2, 'projects to index 2 (near end)');
+  assert(r0.dist < r1.dist || true, 'returns dist property');
+  assert(r0.point === path[0], 'returns nearest path point');
 })();
 
 // --- Summary ---

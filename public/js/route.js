@@ -217,19 +217,11 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
 };
 
 App.orderWaypointsAlongPath = function(shelters, path) {
-  return shelters.slice().sort(function(a, b) {
-    return App.projectOntoPath(a, path) - App.projectOntoPath(b, path);
+  var indexed = shelters.map(function(s) {
+    return { shelter: s, pathIdx: App.closestOnPath(s.location, path).pathIndex };
   });
-};
-
-App.projectOntoPath = function(shelter, path) {
-  var loc = new google.maps.LatLng(shelter.lat, shelter.lon);
-  var bestIdx = 0, bestDist = Infinity;
-  for (var i = 0; i < path.length; i++) {
-    var d = google.maps.geometry.spherical.computeDistanceBetween(loc, path[i]);
-    if (d < bestDist) { bestDist = d; bestIdx = i; }
-  }
-  return bestIdx;
+  indexed.sort(function(a, b) { return a.pathIdx - b.pathIdx; });
+  return indexed.map(function(x) { return x.shelter; });
 };
 
 App.analyseRouteCoverage = function(path, shelters, radius) {
