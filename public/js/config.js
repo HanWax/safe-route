@@ -45,6 +45,26 @@ App.CITY_CONFIGS = [
     },
   },
   {
+    id: 'givatayim',
+    name: 'Givatayim',
+    nameHe: '\u05d2\u05d1\u05e2\u05ea\u05d9\u05d9\u05dd',
+    center: { lat: 32.07, lng: 34.81 },
+    staticUrl: '/api/givatayim-shelters',
+    outFields: ['*'],
+    parseFeat: function(feat) {
+      var a = feat.attributes, g = feat.geometry;
+      var lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: 'giv-' + a.OBJECTID, lat: lat, lon: lon,
+        name: a.name || '\u05de\u05e7\u05dc\u05d8 \u05e6\u05d9\u05d1\u05d5\u05e8\u05d9', type: a.type || '',
+        addr: a.address || '', addrEng: '',
+        area: 0, filtration: '', notes: '',
+        status: '', accessible: '',
+      };
+    },
+  },
+  {
     id: 'beer-sheva',
     name: "Be'er Sheva",
     nameHe: '\u05d1\u05d0\u05e8 \u05e9\u05d1\u05e2',
