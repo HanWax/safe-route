@@ -1441,7 +1441,7 @@ const CITY_CONFIGS = [
     name: 'Tel Aviv-Yafo',
     nameHe: 'תל אביב-יפו',
     center: { lat: 32.08, lng: 34.78 },
-    queryUrl: 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/WM/IView2WM/MapServer/592/query',
+    queryUrl: 'https://gisn.tel-aviv.gov.il/arcgis/rest/services/IView2/MapServer/592/query',
     outFields: ['oid_mitkan','ms_miklat','t_sug','Full_Address','shem_rechov_eng','shetach_mr','t_sinon','hearot','lon','lat','pail','opening_times','is_open','miklat_mungash','shem'],
     parseFeat: (feat) => {
       const a = feat.attributes, g = feat.geometry;
