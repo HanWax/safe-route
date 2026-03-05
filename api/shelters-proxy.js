@@ -12,10 +12,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    const fetchOpts = {};
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    };
     if (parsed.hostname === 'gisviewer.jerusalem.muni.il') {
-      fetchOpts.headers = { 'Referer': 'https://jergisng.jerusalem.muni.il/' };
+      headers['Referer'] = 'https://jergisng.jerusalem.muni.il/';
     }
+    const fetchOpts = { headers };
     const resp = await fetch(url, fetchOpts);
     if (!resp.ok) {
       return res.status(resp.status).json({ error: `Upstream returned ${resp.status}` });
