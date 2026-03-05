@@ -512,8 +512,6 @@ select:focus { border-color: var(--blue); }
   line-height: 1.5; direction: rtl; text-align: right;
 }
 
-/* -- GAP WARNINGS (legacy, kept for compatibility) -- */
-.gap-card { display: none; }
 
 /* -- DISCLAIMER -- */
 .disc {

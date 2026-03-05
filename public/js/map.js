@@ -40,7 +40,10 @@ App.initMap = function() {
   });
   App.dirRenderer.setMap(App.map);
 
-  App.map.addListener('click', function() { App.closeAllIW(); });
+  App.map.addListener('click', function() {
+    App.closeAllIW();
+    if (App._routeInfoWindow) { App._routeInfoWindow.close(); App._routeInfoWindow = null; }
+  });
 
   // Right-click to add community miklat (always available once map loads)
   App.map.addListener('rightclick', function(e) {
@@ -94,7 +97,6 @@ App.drawRoute = function(coveredSegs, gapSegs, gaps) {
       strokeOpacity: 0.9,
       zIndex: 4,
     });
-    App._addRouteTooltip(pl, App.t('coveredTooltip'));
     App.mapObjects.push(pl);
   });
   gapSegs.forEach(function(pts, i) {
