@@ -24,6 +24,8 @@ window.submitReview = function(id, btn) { App.submitReview(id, btn); };
 window.startAddMiklat = function() { App.startAddMiklat(); };
 window.cancelAddMiklat = function() { App.cancelAddMiklat(); };
 window.saveCommunityMiklat = function() { App.saveCommunityMiklat(); };
+window.shareToGoogleMaps = function() { App.shareToGoogleMaps(); };
+window.shareRoute = function(e) { App.shareRoute(e); };
 
 App.useMyLocation = function(fieldId) {
   if (!navigator.geolocation) {
@@ -205,7 +207,15 @@ App.run = async function() {
 
     App.setupDraggableRoute(finalRoute, shelters, radius);
 
+    App.lastRouteShare = {
+      startLocation: finalRoute.startLocation,
+      endLocation: finalRoute.endLocation,
+      waypoints: buildResult.usedShelters,
+      coveragePct: analysis.coveredPct,
+    };
+
     App.renderScore(analysis.coveredPct, analysis.gaps, finalRoute, shelters.length);
+    document.getElementById('shareRow').style.display = '';
     App.setStatus(App.t('statusCalcWalk'), 'info');
     var nearby = await App.renderShelterList(shelters, finalRoute.path, radius);
     App.renderGaps(analysis.gaps);
@@ -292,6 +302,64 @@ App.showFirstRunTip = function() {
       setTimeout(function() { tip.remove(); }, 300);
     }
   }, 12000);
+};
+
+// Share state
+App.lastRouteShare = null;
+
+App.buildGoogleMapsUrl = function() {
+  var share = App.lastRouteShare;
+  if (!share) return null;
+
+  var origin = share.startLocation.lat() + ',' + share.startLocation.lng();
+  var dest = share.endLocation.lat() + ',' + share.endLocation.lng();
+
+  var url = 'https://www.google.com/maps/dir/?api=1'
+    + '&origin=' + origin
+    + '&destination=' + dest
+    + '&travelmode=walking';
+
+  if (share.waypoints.length) {
+    var wpStr = share.waypoints.map(function(w) {
+      return w.lat + ',' + w.lon;
+    }).join('|');
+    url += '&waypoints=' + encodeURIComponent(wpStr);
+  }
+
+  return url;
+};
+
+App.shareToGoogleMaps = function() {
+  var url = App.buildGoogleMapsUrl();
+  if (!url) return;
+  window.open(url, '_blank', 'noopener');
+};
+
+App.shareRoute = function(e) {
+  var url = App.buildGoogleMapsUrl();
+  if (!url) return;
+
+  var share = App.lastRouteShare;
+  var title = App.t('shareTitle')(share.coveragePct);
+  var text = App.t('shareText');
+
+  // Try native share first (mobile)
+  if (navigator.share) {
+    navigator.share({ title: title, text: text, url: url }).catch(function() {});
+    return;
+  }
+
+  // Fallback: copy to clipboard
+  var clickedBtn = e && e.target ? e.target.closest('.share-btn') : null;
+  navigator.clipboard.writeText(url).then(function() {
+    var span = clickedBtn ? clickedBtn.querySelector('span') : document.querySelector('#shareRow .share-btn--copy span');
+    if (!span) return;
+    var origText = span.textContent;
+    span.textContent = App.t('shareLinkCopied');
+    setTimeout(function() { span.textContent = origText; }, 2000);
+  }).catch(function() {
+    window.open(url, '_blank', 'noopener');
+  });
 };
 
 // Event listeners
