@@ -114,8 +114,10 @@ App.renderShelterList = async function(shelters, path, radius) {
       ? wd.distance.text
       : '~' + Math.round(s.routeDist * App.WALK_FACTOR) + 'm';
 
+    var esc = App.escapeHtml || function(x) { return x; };
     var tagsHtml = '';
     var tags = [];
+    if (s.community) tags.push('<span class="s-tag community">' + App.t('communityBadge') + '</span>');
     if (s.type) tags.push('<span class="s-tag">' + s.type + '</span>');
     if (s.accessible === '\u05db\u05df') tags.push('<span class="s-tag accessible">\u267f \u05e0\u05d2\u05d9\u05e9</span>');
     if (s.filtration && s.filtration !== '\u05dc\u05dc\u05d0 \u05de\u05e2\u05e8\u05db\u05ea \u05e1\u05d9\u05e0\u05d5\u05df')
@@ -127,13 +129,14 @@ App.renderShelterList = async function(shelters, path, radius) {
     if (s.area) tags.push('<span class="s-tag">' + s.area + ' \u05de\u05f4\u05e8</span>');
     if (tags.length) tagsHtml = '<div class="s-tags">' + tags.join('') + '</div>';
 
+    var cardName = s.community ? esc(s.addr || s.type || s.name) : (s.addr || s.type || s.name);
     var notesHtml = s.notes
-      ? '<div class="s-notes">' + s.notes + '</div>' : '';
+      ? '<div class="s-notes">' + (s.community ? esc(s.notes) : s.notes) + '</div>' : '';
 
     card.innerHTML =
       '<div class="s-card-row">' +
         '<div class="s-num">' + (i+1) + '</div>' +
-        '<div class="s-name">' + (s.addr || s.type || s.name) + '</div>' +
+        '<div class="s-name">' + cardName + '</div>' +
         '<div class="s-dist">' + walkMin + '\u2032 <span style="font-size:9px;color:var(--muted)">' + distLabel + '</span></div>' +
       '</div>' +
       (s.addr && s.addrEng ? '<div class="s-addr">' + s.addrEng + '</div>' : '') +

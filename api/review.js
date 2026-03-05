@@ -5,7 +5,7 @@ export default async function handler(req, res) {
 
   const { shelter_id, rating, text } = req.body || {};
 
-  if (!shelter_id || !/^tlv-\d+$/.test(shelter_id))
+  if (!shelter_id || !/^[a-z]{2,6}-\d+$/.test(shelter_id))
     return res.status(400).json({ error: 'Invalid shelter_id' });
   if (!Number.isInteger(rating) || rating < 1 || rating > 5)
     return res.status(400).json({ error: 'Rating must be 1-5' });

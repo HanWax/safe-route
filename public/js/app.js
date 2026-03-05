@@ -19,6 +19,9 @@ window.useMyLocation = function(id) { App.useMyLocation(id); };
 window.swapLocations = function() { App.swapLocations(); };
 window.setLang = function(lang) { App.setLang(lang); };
 window.submitReview = function(id, btn) { App.submitReview(id, btn); };
+window.startAddMiklat = function() { App.startAddMiklat(); };
+window.cancelAddMiklat = function() { App.cancelAddMiklat(); };
+window.saveCommunityMiklat = function() { App.saveCommunityMiklat(); };
 
 App.useMyLocation = function(fieldId) {
   if (!navigator.geolocation) {
