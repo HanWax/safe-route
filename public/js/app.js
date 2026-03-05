@@ -15,6 +15,7 @@ App.detectedCity = null;
 
 // Global aliases for HTML onclick handlers
 window.run = function() { App.run(); };
+window.loadExample = function(id) { App.loadExample(id); };
 window.useMyLocation = function(id) { App.useMyLocation(id); };
 window.swapLocations = function() { App.swapLocations(); };
 window.setLang = function(lang) { App.setLang(lang); };
@@ -69,12 +70,7 @@ App.useMyLocation = function(fieldId) {
       var chip = document.getElementById('mobileOriginChip');
       if (chip) chip.classList.remove('active');
     }
-    var msgs = {
-      1: 'Location access denied. Please allow location access in your browser settings.',
-      2: 'Could not determine your location. Please try again.',
-      3: 'Location request timed out. Please try again.',
-    };
-    App.setStatus(msgs[err.code] || 'Could not get your location.', 'err');
+    App.setStatus(App.t('geoError' + err.code) || App.t('geoErrorGeneric'), 'err');
   }
   navigator.geolocation.getCurrentPosition(
     onSuccess,
@@ -93,6 +89,9 @@ App.useMyLocation = function(fieldId) {
 };
 
 App.swapLocations = function() {
+  document.querySelectorAll('.swap-btn').forEach(function(btn) {
+    btn.classList.toggle('rotated');
+  });
   var originEl = document.getElementById('origin');
   var destEl = document.getElementById('dest');
   var mOriginEl = document.getElementById('mobileOrigin');
@@ -132,7 +131,10 @@ App.swapLocations = function() {
   if (chip) chip.classList.toggle('active', !!App.geoLocations.origin);
 };
 
+App._runId = 0;
+
 App.run = async function() {
+  var runId = ++App._runId;
   if (App.isMobile()) App.syncInputs();
 
   var origText = document.getElementById('origin').value.trim();
@@ -175,6 +177,7 @@ App.run = async function() {
 
     var directRoute = await App.getRoute(orig, dest);
     if (!directRoute) return;
+    if (runId !== App._runId) return;
 
     var bbox = App.getPathBbox(directRoute.path, 0.012);
     var city = App.detectCity(directRoute.path);
@@ -211,6 +214,7 @@ App.run = async function() {
     document.getElementById('legend').classList.add('show');
     document.getElementById('emptyState').style.display = 'none';
     document.getElementById('dragHint').classList.add('show');
+    App.showFirstRunTip();
 
     var pctLabel = analysis.coveredPct >= coverageTarget
       ? (analysis.coveredPct >= 99 ? App.t('statusFullCoverage') : App.t('statusMeetsTarget')(analysis.coveredPct, coverageTarget))
@@ -228,6 +232,66 @@ App.run = async function() {
   } finally {
     App.setBusy(false);
   }
+};
+
+App.EXAMPLES = {
+  tlv: {
+    origin: { en: 'Dizengoff Center, Tel Aviv', he: '\u05de\u05e8\u05db\u05d6 \u05d3\u05d9\u05d6\u05e0\u05d2\u05d5\u05e3, \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1' },
+    dest:   { en: 'Rothschild Boulevard 1, Tel Aviv', he: '\u05e9\u05d3\u05e8\u05d5\u05ea \u05e8\u05d5\u05d8\u05e9\u05d9\u05dc\u05d3 1, \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1' },
+  },
+  jer: {
+    origin: { en: 'Jaffa Gate, Jerusalem', he: '\u05e9\u05e2\u05e8 \u05d9\u05e4\u05d5, \u05d9\u05e8\u05d5\u05e9\u05dc\u05d9\u05dd' },
+    dest:   { en: 'Mahane Yehuda Market, Jerusalem', he: '\u05e9\u05d5\u05e7 \u05de\u05d7\u05e0\u05d4 \u05d9\u05d4\u05d5\u05d3\u05d4, \u05d9\u05e8\u05d5\u05e9\u05dc\u05d9\u05dd' },
+  },
+  haifa: {
+    origin: { en: 'Carmel Center, Haifa', he: '\u05de\u05e8\u05db\u05d6 \u05d4\u05db\u05e8\u05de\u05dc, \u05d7\u05d9\u05e4\u05d4' },
+    dest:   { en: 'Haifa Port', he: '\u05e0\u05de\u05dc \u05d7\u05d9\u05e4\u05d4' },
+  },
+};
+
+App.loadExample = function(id) {
+  var ex = App.EXAMPLES[id];
+  if (!ex) return;
+  var lang = App.currentLang;
+  var originVal = ex.origin[lang] || ex.origin.en;
+  var destVal = ex.dest[lang] || ex.dest.en;
+
+  document.getElementById('origin').value = originVal;
+  document.getElementById('dest').value = destVal;
+  App.geoLocations.origin = null;
+  App.geoLocations.dest = null;
+
+  var mo = document.getElementById('mobileOrigin');
+  var md = document.getElementById('mobileDest');
+  if (mo) mo.value = originVal;
+  if (md) md.value = destVal;
+
+  App.run();
+};
+
+App.showFirstRunTip = function() {
+  if (localStorage.getItem('miklat-firstrun-seen')) return;
+  localStorage.setItem('miklat-firstrun-seen', '1');
+
+  var tip = document.createElement('div');
+  tip.className = 'first-run-tip';
+  tip.innerHTML =
+    '<div class="first-run-tip-text">' + App.t('firstRunTip') + '</div>' +
+    '<button class="first-run-tip-dismiss">' + App.t('firstRunDismiss') + '</button>';
+  tip.querySelector('.first-run-tip-dismiss').addEventListener('click', function() {
+    tip.classList.add('out');
+    setTimeout(function() { tip.remove(); }, 300);
+  });
+
+  var mapWrap = document.querySelector('.map-wrap');
+  if (mapWrap) mapWrap.appendChild(tip);
+
+  setTimeout(function() {
+    if (tip.parentNode) {
+      tip.classList.add('out');
+      setTimeout(function() { tip.remove(); }, 300);
+    }
+  }, 12000);
 };
 
 // Event listeners
@@ -309,7 +373,13 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-document.addEventListener('keydown', function(e) { if (e.key === 'Enter') App.run(); });
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var tag = e.target.tagName;
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.target.closest('.community-form') || e.target.closest('.review-form')) return;
+  App.run();
+});
 
 document.addEventListener('DOMContentLoaded', function() {
   if (App.isMobile()) {

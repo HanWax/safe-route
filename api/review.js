@@ -1,7 +1,25 @@
 import sql from './_db.js';
 
+const rateLimitMap = new Map();
+const RATE_WINDOW = 10 * 60 * 1000;
+const RATE_MAX = 20;
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry) { rateLimitMap.set(ip, { count: 1, start: now }); return true; }
+  if (now - entry.start > RATE_WINDOW) { rateLimitMap.set(ip, { count: 1, start: now }); return true; }
+  if (entry.count >= RATE_MAX) return false;
+  entry.count++;
+  return true;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+  if (!checkRateLimit(ip))
+    return res.status(429).json({ error: 'Too many reviews. Please try again later.' });
 
   const { shelter_id, rating, text } = req.body || {};
 
