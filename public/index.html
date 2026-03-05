@@ -517,9 +517,11 @@
     .mobile-search-row input:focus { border-color: var(--blue); background: var(--white); }
     .mobile-search-row input::placeholder { color: var(--muted); }
     .mobile-search-row .loc-btn {
-      position: absolute; right: 4px; top: 50%;
+      position: absolute; right: 0; top: 50%;
       transform: translateY(-50%);
-      padding: 4px 6px;
+      padding: 10px 10px;
+      min-width: 40px; min-height: 40px;
+      display: flex; align-items: center; justify-content: center;
     }
     body.he .mobile-search-row .loc-btn { right: auto; left: 4px; }
     body.he .mobile-search-row input { padding: 9px 10px 9px 32px; }
@@ -565,6 +567,13 @@
       margin-top: 0; flex: 1; padding: 9px; font-size: 12px; border-radius: 6px;
       min-width: 0; white-space: nowrap; overflow: hidden;
     }
+    .mobile-search-status {
+      display: none; font-size: 11px; text-align: center;
+      padding: 6px 8px 2px; color: var(--muted);
+      border-radius: 4px; margin-top: 4px;
+    }
+    .mobile-search-status.err { display: block; color: #c62828; }
+    .mobile-search-status.ok { display: block; color: #2e7d32; }
 
     /* ── MOBILE: BOTTOM SHEET ── */
     .bottom-sheet {
@@ -849,6 +858,7 @@
             <span class="toggle-slider"></span>
           </label>
         </div>
+        <div class="mobile-search-status" id="mobileSearchStatus"></div>
       </div>
     </div>
 
@@ -1053,14 +1063,31 @@ let shelterListUpdateTimer = null;
 // ═══════════════════════════════════════════════════════
 //  USE MY LOCATION
 // ═══════════════════════════════════════════════════════
+function setMobileSearchStatus(msg, type) {
+  const el = document.getElementById('mobileSearchStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'mobile-search-status' + (type ? ' ' + type : '');
+  if (msg) {
+    // Auto-clear after 6 seconds
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => {
+      el.textContent = '';
+      el.className = 'mobile-search-status';
+    }, 6000);
+  }
+}
+
 function useMyLocation(fieldId) {
   if (!navigator.geolocation) {
-    return setStatus(t('geoNotSupported'), 'err');
+    setStatus(t('geoNotSupported'), 'err');
+    if (isMobile()) setMobileSearchStatus(t('geoNotSupported'), 'err');
+    return;
   }
   // Map mobile IDs to canonical keys and sync both inputs
   const mobileMap = { mobileOrigin: 'origin', mobileDest: 'dest' };
   const canonicalId = mobileMap[fieldId] || fieldId;
-  const pairedId = mobileMap[fieldId] ? fieldId : (canonicalId === 'origin' ? 'mobileOrigin' : 'mobileDest');
+  const pairedId = mobileMap[fieldId] ? mobileMap[fieldId] : (canonicalId === 'origin' ? 'mobileOrigin' : 'mobileDest');
 
   const input = document.getElementById(fieldId);
   const paired = document.getElementById(pairedId);
@@ -1068,6 +1095,7 @@ function useMyLocation(fieldId) {
   input.value = t('locating');
   input.disabled = true;
   if (paired) { paired.value = t('locating'); }
+  if (isMobile()) setMobileSearchStatus('');
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
@@ -1087,6 +1115,7 @@ function useMyLocation(fieldId) {
         const chip = document.getElementById('mobileOriginChip');
         if (chip) chip.classList.add('active');
       }
+      if (isMobile()) setMobileSearchStatus(t('myLocation'), 'ok');
     },
     (err) => {
       input.value = '';
@@ -1104,11 +1133,13 @@ function useMyLocation(fieldId) {
         if (chip) chip.classList.remove('active');
       }
       const msgs = {
-        1: 'Location access denied. Please allow location access in your browser settings.',
+        1: 'Location access denied. Tap the \u0041\u0041 icon in Safari\'s address bar → Website Settings → Location → Allow.',
         2: 'Could not determine your location. Please try again.',
         3: 'Location request timed out. Please try again.',
       };
-      setStatus(msgs[err.code] || 'Could not get your location.', 'err');
+      const msg = msgs[err.code] || 'Could not get your location.';
+      setStatus(msg, 'err');
+      if (isMobile()) setMobileSearchStatus(msg, 'err');
     },
     { enableHighAccuracy: true, timeout: 10000 }
   );
