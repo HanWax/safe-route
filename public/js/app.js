@@ -141,7 +141,6 @@ App.run = async function() {
   var origText = document.getElementById('origin').value.trim();
   var destText = document.getElementById('dest').value.trim();
   var radius = parseInt(document.getElementById('radius').value);
-  var coverageTarget = parseInt(document.getElementById('coverageTarget').value);
 
   if (!origText || !destText) {
     App.setStatus(App.t('statusEnterBoth'), 'err');
@@ -187,12 +186,12 @@ App.run = async function() {
     var shelters = await App.fetchShelters(bbox, directRoute.path);
     var dataSrcEl = document.getElementById('dataSrc');
     if (dataSrcEl && App.detectedCities && App.detectedCities.length) {
-      dataSrcEl.innerHTML = 'Data: ' + App.detectedCities.map(function(c) { return c.nameHe; }).join(', ') + ' \u2014 GIS';
+      dataSrcEl.textContent = 'Data: ' + App.detectedCities.map(function(c) { return c.nameHe; }).join(', ') + ' \u2014 GIS';
     }
-    App.setStatus(App.t('statusFoundShelters')(shelters.length, coverageTarget), 'info');
+    App.setStatus(App.t('statusFoundShelters')(shelters.length), 'info');
 
     var buildResult = await App.buildShelterRoute(
-      orig, dest, directRoute, shelters, radius, coverageTarget
+      orig, dest, directRoute, shelters, radius
     );
     var finalRoute = buildResult.waypointRoute || directRoute;
 
@@ -206,7 +205,7 @@ App.run = async function() {
 
     App.setupDraggableRoute(finalRoute, shelters, radius);
 
-    App.renderScore(analysis.coveredPct, analysis.gaps, finalRoute, shelters.length, coverageTarget);
+    App.renderScore(analysis.coveredPct, analysis.gaps, finalRoute, shelters.length);
     App.setStatus(App.t('statusCalcWalk'), 'info');
     var nearby = await App.renderShelterList(shelters, finalRoute.path, radius);
     App.renderGaps(analysis.gaps);
@@ -217,10 +216,10 @@ App.run = async function() {
     document.getElementById('dragHint').classList.add('show');
     App.showFirstRunTip();
 
-    var pctLabel = analysis.coveredPct >= coverageTarget
-      ? (analysis.coveredPct >= 99 ? App.t('statusFullCoverage') : App.t('statusMeetsTarget')(analysis.coveredPct, coverageTarget))
+    var pctLabel = analysis.coveredPct >= 99
+      ? App.t('statusFullCoverage')
       : App.t('statusPartialCoverage')(analysis.coveredPct);
-    App.setStatus(pctLabel, analysis.coveredPct >= coverageTarget ? 'ok' : analysis.coveredPct >= 70 ? 'info' : 'err');
+    App.setStatus(pctLabel, analysis.coveredPct >= 99 ? 'ok' : analysis.coveredPct >= 70 ? 'info' : 'err');
 
     if (App.isMobile()) {
       App.populateBottomSheet();
@@ -318,28 +317,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Coverage target slider sync
-  var ct = document.getElementById('coverageTarget');
-  var ctv = document.getElementById('coverageTargetVal');
-  if (ct && ctv) {
-    ct.addEventListener('input', function() {
-      ctv.textContent = ct.value + '%';
-      var mct = document.getElementById('mobileCoverageTarget');
-      var mctv = document.getElementById('mobileCoverageTargetVal');
-      if (mct) mct.value = ct.value;
-      if (mctv) mctv.textContent = ct.value + '%';
-    });
-  }
-  var mct = document.getElementById('mobileCoverageTarget');
-  var mctv = document.getElementById('mobileCoverageTargetVal');
-  if (mct && mctv) {
-    mct.addEventListener('input', function() {
-      mctv.textContent = mct.value + '%';
-      if (ct) ct.value = mct.value;
-      if (ctv) ctv.textContent = mct.value + '%';
-    });
-  }
-
   // Shelter radius toggle sync
   function toggleShelterCircles(visible) {
     App.shelterCircles.forEach(function(c) { c.setMap(visible ? App.map : null); });
@@ -372,6 +349,12 @@ document.addEventListener('DOMContentLoaded', function() {
       if (commToggle) commToggle.checked = mCommToggle.checked;
     });
   }
+
+  // Mobile init
+  if (App.isMobile()) {
+    App.initBottomSheet();
+    App.initMobileSettings();
+  }
 });
 
 document.addEventListener('keydown', function(e) {
@@ -380,13 +363,6 @@ document.addEventListener('keydown', function(e) {
   if (tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (e.target.closest('.community-form') || e.target.closest('.review-form')) return;
   App.run();
-});
-
-document.addEventListener('DOMContentLoaded', function() {
-  if (App.isMobile()) {
-    App.initBottomSheet();
-    App.initMobileSettings();
-  }
 });
 
 window.addEventListener('resize', function() {

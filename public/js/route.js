@@ -120,8 +120,8 @@ App.fetchShelters = async function(bbox, routePath) {
   return shelters;
 };
 
-App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius, coverageTarget) {
-  coverageTarget = coverageTarget || 80;
+App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius) {
+  var coverageTarget = 100;
   if (!shelters.length) return { waypointRoute: null, usedShelters: [], achievedPct: 0 };
 
   var directCoverage = App.analyseRouteCoverage(directRoute.path, shelters, radius);
@@ -228,7 +228,7 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
 
   if (bestRoute) {
     if (bestPct < coverageTarget) {
-      App.setStatus(App.t('statusBestAchievable')(bestPct, coverageTarget), 'info');
+      App.setStatus(App.t('statusBestAchievable')(bestPct), 'info');
     }
     return { waypointRoute: bestRoute, usedShelters: bestShelters, achievedPct: bestPct };
   }
@@ -400,14 +400,13 @@ App.reanalyseDraggedRoute = function(draggedRoute, shelters, radius) {
 
   App.drawRoute(result.coveredPolyline, result.gapPolylines);
 
-  var coverageTarget = parseInt(document.getElementById('coverageTarget').value);
-  App.renderScore(result.coveredPct, result.gaps, draggedRoute, shelters.length, coverageTarget);
+  App.renderScore(result.coveredPct, result.gaps, draggedRoute, shelters.length);
   App.renderGaps(result.gaps);
 
-  var pctLabel = result.coveredPct >= coverageTarget
-    ? (result.coveredPct >= 99 ? App.t('statusFullCoverage') : App.t('statusMeetsTarget')(result.coveredPct, coverageTarget))
+  var pctLabel = result.coveredPct >= 99
+    ? App.t('statusFullCoverage')
     : App.t('statusPartialCoverage')(result.coveredPct);
-  App.setStatus(pctLabel, result.coveredPct >= coverageTarget ? 'ok' : result.coveredPct >= 70 ? 'info' : 'err');
+  App.setStatus(pctLabel, result.coveredPct >= 99 ? 'ok' : result.coveredPct >= 70 ? 'info' : 'err');
 
   clearTimeout(App.shelterListUpdateTimer);
   App.shelterListUpdateTimer = setTimeout(async function() {
