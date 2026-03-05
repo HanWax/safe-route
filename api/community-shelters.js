@@ -9,12 +9,17 @@ export default async function handler(req, res) {
   if ([s, n, w, e].some(isNaN))
     return res.status(400).json({ error: 'Bounding box params required: south, north, west, east' });
 
+  // Clamp to Israel bounds to prevent full-table scans
+  const cs = Math.max(s, 29), cn = Math.min(n, 34), cw = Math.max(w, 34), ce = Math.min(e, 36);
+  if (cs >= cn || cw >= ce)
+    return res.status(400).json({ error: 'Bounding box out of range' });
+
   try {
     const rows = await sql`
       SELECT id, lat, lng, name, description, created_at
       FROM community_shelters
-      WHERE lat BETWEEN ${s} AND ${n}
-        AND lng BETWEEN ${w} AND ${e}
+      WHERE lat BETWEEN ${cs} AND ${cn}
+        AND lng BETWEEN ${cw} AND ${ce}
       ORDER BY created_at DESC
       LIMIT 500
     `;

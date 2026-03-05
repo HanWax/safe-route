@@ -1,5 +1,7 @@
 window.App = window.App || {};
 
+App.COMMUNITY_COLOR = '#E88A1A';
+
 App.escapeHtml = function(str) {
   var div = document.createElement('div');
   div.textContent = str;
@@ -11,6 +13,7 @@ App.communityPlacementMarker = null;
 App.communityPlacementLatLng = null;
 App.communityMarkers = [];
 App._communityAutocomplete = null;
+App._savedCommunityIds = new Set();
 
 // Ensure map is loaded before community actions
 App._ensureMap = async function() {
@@ -61,7 +64,7 @@ App._placeOrMoveMarker = function(latLng) {
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
         scale: 12,
-        fillColor: '#E88A1A',
+        fillColor: App.COMMUNITY_COLOR,
         fillOpacity: 1,
         strokeColor: '#0f0f0f',
         strokeWeight: 2,
@@ -139,6 +142,13 @@ App.cancelAddMiklat = function() {
   if (App.map) App.map.setOptions({ draggableCursor: null });
 };
 
+// Close form on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('communityFormOverlay').classList.contains('show')) {
+    App.cancelAddMiklat();
+  }
+});
+
 App.saveCommunityMiklat = async function() {
   var addrInput = document.getElementById('communityAddressInput');
   var address = addrInput.value.trim();
@@ -195,9 +205,11 @@ App.saveCommunityMiklat = async function() {
     if (!res.ok) throw new Error('Failed');
 
     var saved = await res.json();
+    var savedId = 'comm-' + saved.id;
 
+    App._savedCommunityIds.add(savedId);
     App.addCommunityMarkerToMap({
-      id: 'comm-' + saved.id,
+      id: savedId,
       lat: coords.lat,
       lng: coords.lng,
       name: name,
@@ -247,7 +259,7 @@ App.addCommunityMarkerToMap = function(s) {
     icon: {
       path: google.maps.SymbolPath.CIRCLE,
       scale: 9,
-      fillColor: '#E88A1A',
+      fillColor: App.COMMUNITY_COLOR,
       fillOpacity: 1,
       strokeColor: '#0f0f0f',
       strokeWeight: 1.5,
@@ -258,7 +270,7 @@ App.addCommunityMarkerToMap = function(s) {
   var iw = new google.maps.InfoWindow({
     content: '<div style="font-family:\'DM Mono\',monospace;font-size:12px;padding:2px 4px;max-width:260px">' +
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
-        '<span style="background:#E88A1A;color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">' + App.t('communityBadge') + '</span>' +
+        '<span style="background:' + App.COMMUNITY_COLOR + ';color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">' + App.t('communityBadge') + '</span>' +
       '</div>' +
       '<b style="font-family:\'Syne\',sans-serif;font-size:13px">' + safeName + '</b>' +
       (safeDesc ? '<div style="color:#666;font-size:11px;margin-top:4px;line-height:1.4">' + safeDesc + '</div>' : '') +
@@ -271,8 +283,7 @@ App.addCommunityMarkerToMap = function(s) {
     iw.open(App.map, marker);
   });
 
-  App.communityMarkers.push(marker);
-  App.communityMarkers.push(iw);
+  App.communityMarkers.push({ marker: marker, iw: iw });
 
   // Also add to mapObjects for cleanup and InfoWindow close on map click
   App.mapObjects.push(marker);
@@ -288,27 +299,31 @@ App.fetchCommunityShelters = async function(bbox) {
     var res = await fetch('/api/community-shelters?' + params);
     if (!res.ok) return [];
     var rows = await res.json();
-    return rows.map(function(r) {
-      return {
-        id: 'comm-' + r.id,
-        lat: r.lat,
-        lng: r.lng,
-        lon: r.lng,
-        name: r.name,
-        description: r.description,
-        community: true,
-        source: 'community',
-        type: '',
-        addr: '',
-        addrEng: '',
-        area: 0,
-        filtration: '',
-        notes: '',
-        status: '',
-        accessible: '',
-        location: null, // will be set after google maps is loaded
-      };
-    });
+    return rows
+      .map(function(r) {
+        return {
+          id: 'comm-' + r.id,
+          lat: r.lat,
+          lng: r.lng,
+          lon: r.lng,
+          name: r.name,
+          description: r.description,
+          community: true,
+          source: 'community',
+          type: '',
+          addr: '',
+          addrEng: '',
+          area: 0,
+          filtration: '',
+          notes: '',
+          status: '',
+          accessible: '',
+          location: null, // will be set after google maps is loaded
+        };
+      })
+      .filter(function(s) {
+        return !App._savedCommunityIds.has(s.id);
+      });
   } catch (e) {
     console.warn('community shelters fetch failed', e);
     return [];
