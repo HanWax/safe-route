@@ -398,10 +398,9 @@ App.reanalyseDraggedRoute = function(draggedRoute, shelters, radius) {
 
   var result = App.analyseRouteCoverage(draggedRoute.path, shelters, radius);
 
-  App.drawRoute(result.coveredPolyline, result.gapPolylines);
+  App.drawRoute(result.coveredPolyline, result.gapPolylines, result.gaps);
 
   App.renderScore(result.coveredPct, result.gaps, draggedRoute, shelters.length);
-  App.renderGaps(result.gaps);
 
   var pctLabel = result.coveredPct >= 99
     ? App.t('statusFullCoverage')

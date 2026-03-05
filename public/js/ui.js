@@ -75,24 +75,14 @@ App.renderScore = function(pct, gaps, route, shelterCount) {
     gapDistTotal > 0 ? (gapDistTotal >= 1000 ? (gapDistTotal/1000).toFixed(1) + 'km' : gapDistTotal + 'm') : '0m';
 };
 
-App.renderGaps = function(gaps) {
-  var sec = document.getElementById('gapSection');
-  var list = document.getElementById('gapList');
-  if (!gaps.length) { sec.style.display = 'none'; return; }
-  sec.style.display = 'block';
-  list.innerHTML = '';
-  gaps.forEach(function(g, i) {
-    var walkSec = Math.round(g.distMeters / 1.4);
-    var walkMin = Math.ceil(walkSec / 60);
-    var div = document.createElement('div');
-    div.className = 'gap-card';
-    div.style.animationDelay = (i * 60) + 'ms';
-    div.innerHTML = App.t('gapLabel')(i+1, g.distMeters, walkMin);
-    div.addEventListener('click', function() {
-      var mid = g.points[Math.floor(g.points.length/2)];
-      App.map.panTo(mid); App.map.setZoom(16);
-    });
-    list.appendChild(div);
+App.initShelterToggle = function() {
+  var toggle = document.getElementById('shelterToggle');
+  if (!toggle || toggle._bound) return;
+  toggle._bound = true;
+  toggle.addEventListener('click', function() {
+    var list = toggle.nextElementSibling;
+    var isOpen = list.classList.toggle('open');
+    toggle.classList.toggle('open', isOpen);
   });
 };
 
@@ -102,6 +92,10 @@ App.renderShelterList = async function(shelters, path, radius) {
   if (!shelters.length) { sec.style.display = 'none'; return; }
   sec.style.display = 'block';
   list.innerHTML = '';
+  list.classList.remove('open');
+  var toggle = document.getElementById('shelterToggle');
+  if (toggle) toggle.classList.remove('open');
+  App.initShelterToggle();
 
   var effectiveRadius = radius / App.WALK_FACTOR;
   var nearby = shelters
@@ -111,6 +105,9 @@ App.renderShelterList = async function(shelters, path, radius) {
     })
     .filter(function(s) { return s.routeDist <= effectiveRadius * 1.5; })
     .sort(function(a, b) { return a.pathIndex - b.pathIndex; });
+
+  var countEl = document.getElementById('shelterCount');
+  if (countEl) countEl.textContent = '(' + nearby.length + ')';
 
   var walkData = [];
   if (nearby.length) {
