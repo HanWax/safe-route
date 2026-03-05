@@ -440,23 +440,18 @@ App.detectCity = function(routePath) {
 App.detectCities = function(routePath) {
   if (!routePath || !routePath.length) return [App.CITY_CONFIGS[0]];
 
-  // Compute route bounding box
-  var s = Infinity, n = -Infinity, w = Infinity, e = -Infinity;
-  for (var i = 0; i < routePath.length; i++) {
-    var lat = routePath[i].lat(), lng = routePath[i].lng();
-    if (lat < s) s = lat; if (lat > n) n = lat;
-    if (lng < w) w = lng; if (lng > e) e = lng;
-  }
-
-  // ~5km buffer in degrees
-  var buf = 0.045;
-  s -= buf; n += buf; w -= buf; e += buf;
-
+  // Check distance from each city center to the nearest point on the route
+  var MAX_DIST_KM = 3;
   var matches = [];
   for (var j = 0; j < App.CITY_CONFIGS.length; j++) {
     var cfg = App.CITY_CONFIGS[j];
-    if (cfg.center.lat >= s && cfg.center.lat <= n &&
-        cfg.center.lng >= w && cfg.center.lng <= e) {
+    var cityLoc = new google.maps.LatLng(cfg.center.lat, cfg.center.lng);
+    var minDist = Infinity;
+    for (var i = 0; i < routePath.length; i++) {
+      var d = google.maps.geometry.spherical.computeDistanceBetween(cityLoc, routePath[i]);
+      if (d < minDist) minDist = d;
+    }
+    if (minDist <= MAX_DIST_KM * 1000) {
       matches.push(cfg);
     }
   }
