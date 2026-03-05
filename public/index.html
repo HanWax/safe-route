@@ -1070,8 +1070,7 @@ function useMyLocation(fieldId) {
   input.disabled = true;
   if (paired) { paired.value = t('locating'); }
 
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
+  function onSuccess(pos) {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       geoLocations[canonicalId] = { lat, lng };
@@ -1088,8 +1087,8 @@ function useMyLocation(fieldId) {
         const chip = document.getElementById('mobileOriginChip');
         if (chip) chip.classList.add('active');
       }
-    },
-    (err) => {
+  }
+  function onError(err) {
       input.value = '';
       input.disabled = false;
       geoLocations[canonicalId] = null;
@@ -1110,8 +1109,23 @@ function useMyLocation(fieldId) {
         3: 'Location request timed out. Please try again.',
       };
       setStatus(msgs[err.code] || 'Could not get your location.', 'err');
+  }
+  // Try with high accuracy first; on timeout, fall back to low accuracy
+  // (mobile Safari GPS can be slow; network-based location is faster)
+  navigator.geolocation.getCurrentPosition(
+    onSuccess,
+    function(err) {
+      if (err.code === 3) {
+        // Timeout with high accuracy — retry without it
+        navigator.geolocation.getCurrentPosition(
+          onSuccess, onError,
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+        );
+      } else {
+        onError(err);
+      }
     },
-    { enableHighAccuracy: true, timeout: 10000 }
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
   );
 }
 
