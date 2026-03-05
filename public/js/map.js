@@ -251,6 +251,8 @@ App.clearAll = function() {
   }
 
   document.getElementById('scoreWrap').classList.remove('show');
+  document.getElementById('shareRow').style.display = 'none';
+  App.lastRouteShare = null;
   document.getElementById('shelterSection').style.display = 'none';
   document.getElementById('gapSection').style.display = 'none';
   document.getElementById('shelterList').innerHTML = '';

@@ -380,6 +380,40 @@ select:focus { border-color: var(--blue); }
   text-transform: uppercase; letter-spacing: 0.1em;
 }
 
+/* -- SHARE ROW -- */
+.share-row {
+  display: none;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--paper2);
+}
+.score-wrap.show .share-row { display: flex; }
+.share-btn {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px; font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  min-width: 0;
+}
+.share-btn:hover {
+  background: var(--white);
+  border-color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.share-btn:active { transform: scale(0.97); }
+.share-btn--gmaps { color: var(--blue); border-color: rgba(26,77,232,0.25); }
+.share-btn--gmaps:hover { border-color: var(--blue); background: var(--blue-dim); }
+.share-btn svg { flex-shrink: 0; }
+
 /* -- SHELTER LIST -- */
 .section-head {
   font-size: 9px; letter-spacing: 0.16em;

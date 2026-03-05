@@ -91,6 +91,12 @@ App.STRINGS = {
     communityBadge: 'Community-reported',
     communityLegend: 'Community miklat',
     communityDisclaimer: 'Community-reported shelters are unverified. Use at your own discretion.',
+    shareRoute: 'Share route',
+    shareViaGMaps: 'Open in Google Maps',
+    shareCopyLink: 'Copy link',
+    shareLinkCopied: 'Link copied!',
+    shareTitle: function(pct) { return 'Safe walking route (' + pct + '% shelter coverage)'; },
+    shareText: 'Check out this shelter-safe walking route I found on Miklat Route!',
   },
   he: {
     headerTag: '\u05d4\u05dc\u05d9\u05db\u05d4 \u05de\u05d5\u05d2\u05e0\u05ea \u00b7 \u05d9\u05e9\u05e8\u05d0\u05dc',
@@ -182,6 +188,12 @@ App.STRINGS = {
     communityBadge: '\u05d3\u05d9\u05d5\u05d5\u05d7 \u05e7\u05d4\u05d9\u05dc\u05ea\u05d9',
     communityLegend: '\u05de\u05e7\u05dc\u05d8 \u05e7\u05d4\u05d9\u05dc\u05ea\u05d9',
     communityDisclaimer: '\u05de\u05e7\u05dc\u05d8\u05d9\u05dd \u05e9\u05d3\u05d5\u05d5\u05d7\u05d5 \u05e2\u05f4\u05d9 \u05d4\u05e7\u05d4\u05d9\u05dc\u05d4 \u05d0\u05d9\u05e0\u05dd \u05de\u05d0\u05d5\u05de\u05ea\u05d9\u05dd. \u05d4\u05e9\u05ea\u05de\u05e9\u05d5 \u05dc\u05e4\u05d9 \u05e9\u05d9\u05e7\u05d5\u05dc \u05d3\u05e2\u05ea\u05db\u05dd.',
+    shareRoute: '\u05e9\u05ea\u05e4\u05d5 \u05de\u05e1\u05dc\u05d5\u05dc',
+    shareViaGMaps: '\u05e4\u05ea\u05d7 \u05d1\u05d2\u05d5\u05d2\u05dc \u05de\u05e4\u05d5\u05ea',
+    shareCopyLink: '\u05d4\u05e2\u05ea\u05e7 \u05e7\u05d9\u05e9\u05d5\u05e8',
+    shareLinkCopied: '\u05d4\u05e7\u05d9\u05e9\u05d5\u05e8 \u05d4\u05d5\u05e2\u05ea\u05e7!',
+    shareTitle: function(pct) { return '\u05de\u05e1\u05dc\u05d5\u05dc \u05d4\u05dc\u05d9\u05db\u05d4 \u05de\u05d5\u05d2\u05df (' + pct + '% \u05db\u05d9\u05e1\u05d5\u05d9)'; },
+    shareText: '\u05e6\u05d0\u05d5 \u05d0\u05ea \u05de\u05e1\u05dc\u05d5\u05dc \u05d4\u05d4\u05dc\u05d9\u05db\u05d4 \u05d4\u05de\u05d5\u05d2\u05df \u05e9\u05de\u05e6\u05d0\u05ea\u05d9 \u05d1\u05de\u05e7\u05dc\u05d8!',
   }
 };
 
