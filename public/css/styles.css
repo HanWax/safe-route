@@ -850,16 +850,58 @@ body.he .mobile-search-row input { padding: 10px 12px 10px 34px; }
 .mobile-search-actions {
   display: flex; align-items: center; gap: 8px; margin-top: 10px;
 }
-.mobile-search-actions select {
-  font-size: 12px; border-radius: var(--radius-md); padding: 7px 10px;
-  flex: 0 1 auto;
-  border: 1.5px solid var(--border); background: var(--paper);
-  min-width: 0; max-width: 40%;
-}
 .mobile-search-actions .btn {
   margin-top: 0; flex: 1; padding: 10px; font-size: 12px;
   border-radius: var(--radius-md);
   min-width: 0; white-space: nowrap; overflow: hidden;
+}
+
+/* -- MOBILE SETTINGS COLLAPSIBLE -- */
+.mobile-settings-toggle {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; margin-top: 8px; padding: 7px;
+  background: none; border: none; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-size: 10px;
+  color: var(--muted); letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+.mobile-settings-toggle:hover { color: var(--ink); }
+.mobile-settings-chevron {
+  fill: currentColor;
+  transition: transform 0.25s var(--ease-out);
+}
+.mobile-settings-toggle.open .mobile-settings-chevron {
+  transform: rotate(180deg);
+}
+.mobile-settings-panel {
+  display: none;
+  padding: 4px 0 0;
+  animation: settingsReveal 0.25s var(--ease-out);
+}
+.mobile-settings-panel.open { display: block; }
+@keyframes settingsReveal {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.mobile-settings-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.mobile-settings-row label {
+  font-size: 10px; color: var(--muted); flex: 1;
+}
+.mobile-settings-row select {
+  font-size: 12px; border-radius: var(--radius-md); padding: 7px 10px;
+  border: 1.5px solid var(--border); background: var(--paper);
+}
+.mobile-settings-panel .toggle-row { margin-top: 8px; }
+.mobile-settings-panel .toggle-row label { font-size: 10px; }
+.mobile-settings-panel .target-row { margin-top: 8px; }
+.mobile-settings-panel .target-row label { font-size: 10px; }
+.mobile-settings-panel .target-val { font-size: 11px; }
+.mobile-settings-panel .btn-community {
+  margin-top: 8px; font-size: 11px; padding: 7px;
 }
 
 /* ==== MOBILE: BOTTOM SHEET ==== */
@@ -925,13 +967,21 @@ body.he .mobile-search-row input { padding: 10px 12px 10px 34px; }
   .mobile-status { display: block; }
 
   .legend {
-    bottom: auto; top: unset; right: 10px;
-    padding: 10px 12px; font-size: 10px; min-width: 145px;
-    border-radius: var(--radius-md); border: 1px solid var(--border);
-    box-shadow: var(--shadow-md);
+    display: none !important;
   }
 
-  body.he .legend { right: auto; left: 10px; }
+  .mobile-legend-inline {
+    display: block !important;
+    position: static;
+    margin-top: 16px;
+    padding: 12px 14px;
+    font-size: 10px;
+    min-width: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    box-shadow: none;
+    background: var(--paper);
+  }
 }
 
 /* -- Focus visible for keyboard nav -- */

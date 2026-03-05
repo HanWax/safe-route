@@ -209,38 +209,47 @@
           </div>
         </div>
         <div class="mobile-search-actions">
-          <select id="mobileRadius">
-            <option value="200">~200m</option>
-            <option value="400" selected>~400m</option>
-            <option value="600">~600m</option>
-          </select>
           <button class="btn" id="mobileGoBtn" onclick="run()">
             <span class="bt" data-i18n="btnGoMobile">PLAN ROUTE</span>
             <div class="sp"></div>
           </button>
         </div>
-        <div class="target-row" style="margin-top:6px">
-          <label style="font-size:10px">Cover</label>
-          <input type="range" class="target-slider" id="mobileCoverageTarget" min="50" max="100" step="5" value="80"/>
-          <span class="target-val" id="mobileCoverageTargetVal" style="font-size:11px">80%</span>
-        </div>
-        <div class="toggle-row" style="margin-top:4px">
-          <label for="mobileShowRadius" style="font-size:10px" data-i18n="showRadius">Show shelter radius</label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="mobileShowRadius"/>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="toggle-row" style="margin-top:4px">
-          <label for="mobileIncludeCommunity" style="font-size:10px" data-i18n="includeCommunity">Include community miklatim</label>
-          <label class="toggle-switch">
-            <input type="checkbox" id="mobileIncludeCommunity" checked/>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <button class="btn btn-community" style="margin-top:6px;font-size:11px;padding:7px" onclick="startAddMiklat()">
-          <span data-i18n="addMiklat">Add community-reported miklat</span>
+        <button class="mobile-settings-toggle" id="mobileSettingsToggle" type="button">
+          <span data-i18n="settings">Settings</span>
+          <svg class="mobile-settings-chevron" viewBox="0 0 24 24" width="14" height="14"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
         </button>
+        <div class="mobile-settings-panel" id="mobileSettingsPanel">
+          <div class="mobile-settings-row">
+            <label data-i18n="maxGap">Max gap from miklat</label>
+            <select id="mobileRadius">
+              <option value="200">~200m</option>
+              <option value="400" selected>~400m</option>
+              <option value="600">~600m</option>
+            </select>
+          </div>
+          <div class="target-row">
+            <label data-i18n="coverageTarget">Coverage target</label>
+            <input type="range" class="target-slider" id="mobileCoverageTarget" min="50" max="100" step="5" value="80"/>
+            <span class="target-val" id="mobileCoverageTargetVal">80%</span>
+          </div>
+          <div class="toggle-row">
+            <label for="mobileShowRadius" data-i18n="showRadius">Show shelter radius</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="mobileShowRadius"/>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <label for="mobileIncludeCommunity" data-i18n="includeCommunity">Include community miklatim</label>
+            <label class="toggle-switch">
+              <input type="checkbox" id="mobileIncludeCommunity" checked/>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <button class="btn btn-community" onclick="startAddMiklat()">
+            <span data-i18n="addMiklat">Add community-reported miklat</span>
+          </button>
+        </div>
       </div>
     </div>
 

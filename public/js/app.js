@@ -314,8 +314,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Enter') App.ru
 document.addEventListener('DOMContentLoaded', function() {
   if (App.isMobile()) {
     App.initBottomSheet();
-    var legend = document.getElementById('legend');
-    if (legend) legend.style.bottom = (App.SHEET_PEEK + 10) + 'px';
+    App.initMobileSettings();
   }
 });
 
