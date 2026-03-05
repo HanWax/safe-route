@@ -522,6 +522,15 @@ select {
   margin-bottom: 12px;
 }
 .community-form textarea:focus { border-color: var(--community); }
+.community-form-addr-status {
+  font-size: 10px; min-height: 16px; margin-bottom: 6px;
+  color: var(--muted); line-height: 1.4;
+}
+.community-form-addr-status.err { color: var(--red); }
+.community-form-hint {
+  font-size: 9.5px; color: var(--muted); line-height: 1.5;
+  margin-bottom: 10px;
+}
 .community-form-actions {
   display: flex; gap: 8px; justify-content: flex-end;
 }
