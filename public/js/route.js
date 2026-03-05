@@ -68,6 +68,7 @@ App.fetchShelters = async function(bbox, routePath) {
     }
 
     var resp = await fetch(fetchUrl);
+    if (!resp.ok) throw new Error('Shelter data request failed (' + resp.status + ')');
     var data = await resp.json();
 
     if (data.error) {
@@ -122,13 +123,18 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   }
 
   var effectiveRadius = radius / App.WALK_FACTOR;
+  var directGapDist = directCoverage.gapDist || 0;
   var bestRoute = null;
+  var bestGapDist = directGapDist;
   var bestPct = directCoverage.coveredPct;
   var bestShelters = [];
   var usedIds = new Set();
   var selectedShelters = [];
   var MAX_WAYPOINTS = 23;
   var MAX_ITERATIONS = 3;
+  // Reject detours that add more exposed distance than they save
+  var MAX_DETOUR_RATIO = 1.5;
+  var directDist = directRoute.totalDistance;
 
   for (var iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     var currentPath = bestRoute ? bestRoute.path : directRoute.path;
@@ -149,7 +155,7 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
         var routeDist = App.minDistToPath(s.location, currentPath);
         return { shelter: s, coverCount: coverCount, routeDist: routeDist };
       })
-      .filter(function(x) { return x.coverCount > 0 && x.routeDist < radius * 4 / App.WALK_FACTOR; })
+      .filter(function(x) { return x.coverCount > 0 && x.routeDist < radius * 2 / App.WALK_FACTOR; })
       .sort(function(a, b) { return b.coverCount - a.coverCount || a.routeDist - b.routeDist; });
 
     var batchSize = Math.min(8, MAX_WAYPOINTS - selectedShelters.length);
@@ -173,9 +179,21 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
       var waypoints = orderedShelters.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
       var wpRoute = await App.getRoute(orig, dest, waypoints);
       if (wpRoute) {
+        // Reject routes that are too long compared to the direct path
+        if (wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {
+          // Revert to previous best and stop adding waypoints
+          selectedShelters.length = 0;
+          bestShelters.forEach(function(s) { selectedShelters.push(s); });
+          usedIds.clear();
+          bestShelters.forEach(function(s) { usedIds.add(s.id); });
+          break;
+        }
         var coverage = App.analyseRouteCoverage(wpRoute.path, shelters, radius);
-        if (coverage.coveredPct > bestPct) {
+        var newGapDist = coverage.gapDist || 0;
+        // Accept route only if it reduces total exposed (uncovered) meters
+        if (newGapDist < bestGapDist) {
           bestRoute = wpRoute;
+          bestGapDist = newGapDist;
           bestPct = coverage.coveredPct;
           bestShelters = selectedShelters.slice();
         } else {
@@ -200,7 +218,7 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
     return { waypointRoute: bestRoute, usedShelters: bestShelters, achievedPct: bestPct };
   }
 
-  // Fallback: single-pass nearest-shelter approach
+  // Fallback: single-pass nearest-shelter approach (only close shelters)
   var waypointShelterSet = new Set();
   var waypointShelters = [];
   for (var gi = 0; gi < gapPoints.length; gi++) {
@@ -209,7 +227,7 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
       var d = google.maps.geometry.spherical.computeDistanceBetween(gapPoints[gi], shelters[si].location);
       if (d < nearestD) { nearestD = d; nearest = shelters[si]; }
     }
-    if (nearest && !waypointShelterSet.has(nearest.id) && nearestD < (radius * 4) / App.WALK_FACTOR) {
+    if (nearest && !waypointShelterSet.has(nearest.id) && nearestD < (radius * 2) / App.WALK_FACTOR) {
       waypointShelterSet.add(nearest.id);
       waypointShelters.push(nearest);
     }
@@ -222,8 +240,16 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
     var orderedFallback = App.orderWaypointsAlongPath(waypointShelters, directRoute.path);
     var waypoints = orderedFallback.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
     var wpRoute = await App.getRoute(orig, dest, waypoints);
-    var pct = wpRoute ? App.analyseRouteCoverage(wpRoute.path, shelters, radius).coveredPct : 0;
-    return { waypointRoute: wpRoute, usedShelters: waypointShelters, achievedPct: pct };
+    if (wpRoute && wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {
+      return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
+    }
+    var fallbackCoverage = wpRoute ? App.analyseRouteCoverage(wpRoute.path, shelters, radius) : null;
+    var fallbackGapDist = fallbackCoverage ? (fallbackCoverage.gapDist || 0) : Infinity;
+    // Only use fallback route if it actually reduces exposed distance
+    if (fallbackGapDist < directGapDist) {
+      return { waypointRoute: wpRoute, usedShelters: waypointShelters, achievedPct: fallbackCoverage.coveredPct };
+    }
+    return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
   } catch (e) {
     console.warn('Waypoint route failed, falling back', e);
     return { waypointRoute: directRoute, usedShelters: [], achievedPct: directCoverage.coveredPct };
