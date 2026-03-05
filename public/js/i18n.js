@@ -1,0 +1,153 @@
+window.App = window.App || {};
+
+App.STRINGS = {
+  en: {
+    headerTag: 'Shelter-Safe Walking \u00b7 Israel',
+    lblRoute: 'Route',
+    phStart: 'Start\u2026',
+    phDest: 'Destination\u2026',
+    maxGap: 'Max gap from miklat',
+    rad200: '2 min (~200m)',
+    rad400: '5 min (~400m)',
+    rad600: '7 min (~600m)',
+    coverageTarget: 'Coverage target',
+    targetHint: 'Higher targets may produce longer, more circuitous routes.',
+    btnGo: 'PLAN SAFE ROUTE',
+    btnGoMobile: 'PLAN ROUTE',
+    routeCoverage: 'Route coverage',
+    routeLength: 'Route length',
+    walkTime: 'Walk time',
+    miklatim: 'Miklatim',
+    gapSegments: 'Gap segments',
+    exposedDist: 'Exposed dist.',
+    dragHint: '\u270b Drag the route on the map to adjust it manually. Coverage will update in real time.',
+    coverageGaps: '\u26a0 Coverage gaps',
+    miklatimOnRoute: 'Miklatim on route',
+    safetyNoticeLabel: '\u26a0 Safety notice:',
+    safetyNoticeText: 'Shelter data from municipal GIS sources. Coverage may be incomplete or outdated. Always verify shelter locations locally and follow Home Front Command (\u05e4\u05d9\u05e7\u05d5\u05d3 \u05d4\u05e2\u05d5\u05e8\u05e3) guidance in emergencies.',
+    emptyText: 'Enter a start and end point in Israel.<br/>The app will find a walking route that keeps you within reach of a \u05de\u05e7\u05dc\u05d8 at all times.',
+    legend: 'Legend',
+    legStart: 'Start point',
+    legEnd: 'End point',
+    legMiklat: 'Miklat (\u05de\u05e7\u05dc\u05d8)',
+    legSafe: 'Safe route',
+    legGap: 'Coverage gap',
+    legRadius: 'Shelter radius',
+    legDrag: '\u270b Drag route to adjust',
+    showRadius: 'Show shelter radius',
+    statusEnterBoth: 'Enter both a start and end point.',
+    statusLoadingConfig: 'Loading configuration\u2026',
+    statusConfigErr: 'Could not load API config. Is GOOGLE_MAPS_API_KEY set in Vercel?',
+    statusLoadingMaps: 'Loading Google Maps\u2026',
+    statusGettingRoute: 'Getting walking route\u2026',
+    statusFetchingShelters: function(city) { return 'Fetching \u05de\u05e7\u05dc\u05d8\u05d9\u05dd from ' + city + '\u2026'; },
+    statusFoundShelters: function(n, tgt) { return 'Found ' + n + ' miklatim. Optimising for ' + tgt + '% coverage\u2026'; },
+    statusRoutingWaypoints: function(iter, n) { return 'Iteration ' + iter + ': routing through ' + n + ' shelter waypoints\u2026'; },
+    statusBestAchievable: function(pct, tgt) { return 'Best achievable: ' + pct + '% (target: ' + tgt + '%). Drag the route to improve.'; },
+    statusCalcWalk: 'Calculating walking distances\u2026',
+    statusFullCoverage: '\u2713 Fully covered route',
+    statusMeetsTarget: function(pct, tgt) { return '\u2713 ' + pct + '% coverage meets your ' + tgt + '% target'; },
+    statusPartialCoverage: function(pct) { return pct + '% of route within shelter radius'; },
+    gapLabel: function(i, dist, min) { return '<strong>Gap ' + i + '</strong> \u2014 ' + dist + 'm with no shelter within radius (~' + min + ' min exposed)'; },
+    rateThisShelter: 'Rate this shelter',
+    submitBtn: 'Submit',
+    phReview: 'Optional review (max 500 chars)',
+    routeWaypoint: '\u2605 Route waypoint',
+    thankYou: 'Thanks!',
+    errorRetry: 'Error \u2014 retry',
+    geoNotSupported: 'Geolocation is not supported by your browser.',
+    locating: 'Locating\u2026',
+    myLocation: 'My Location',
+    swapTooltip: 'Swap origin and destination',
+    useCurrentLocation: 'Use current location',
+  },
+  he: {
+    headerTag: '\u05d4\u05dc\u05d9\u05db\u05d4 \u05de\u05d5\u05d2\u05e0\u05ea \u00b7 \u05d9\u05e9\u05e8\u05d0\u05dc',
+    lblRoute: '\u05de\u05e1\u05dc\u05d5\u05dc',
+    phStart: '\u05e0\u05e7\u05d5\u05d3\u05ea \u05d4\u05ea\u05d7\u05dc\u05d4\u2026',
+    phDest: '\u05d9\u05e2\u05d3\u2026',
+    maxGap: '\u05de\u05e8\u05d7\u05e7 \u05de\u05e8\u05d1\u05d9 \u05de\u05de\u05e7\u05dc\u05d8',
+    rad200: '2 \u05d3\u05e7\u05f3 (~200 \u05de\u05f3)',
+    rad400: '5 \u05d3\u05e7\u05f3 (~400 \u05de\u05f3)',
+    rad600: '7 \u05d3\u05e7\u05f3 (~600 \u05de\u05f3)',
+    coverageTarget: '\u05d9\u05e2\u05d3 \u05db\u05d9\u05e1\u05d5\u05d9',
+    targetHint: '\u05d9\u05e2\u05d3\u05d9\u05dd \u05d2\u05d1\u05d5\u05d4\u05d9\u05dd \u05e2\u05e9\u05d5\u05d9\u05d9\u05dd \u05dc\u05d9\u05d9\u05e6\u05e8 \u05de\u05e1\u05dc\u05d5\u05dc\u05d9\u05dd \u05d0\u05e8\u05d5\u05db\u05d9\u05dd \u05d5\u05de\u05e4\u05d5\u05ea\u05dc\u05d9\u05dd \u05d9\u05d5\u05ea\u05e8.',
+    btnGo: '\u05ea\u05db\u05e0\u05df \u05de\u05e1\u05dc\u05d5\u05dc \u05de\u05d5\u05d2\u05df',
+    btnGoMobile: '\u05ea\u05db\u05e0\u05df \u05de\u05e1\u05dc\u05d5\u05dc',
+    routeCoverage: '\u05db\u05d9\u05e1\u05d5\u05d9 \u05de\u05e1\u05dc\u05d5\u05dc',
+    routeLength: '\u05d0\u05d5\u05e8\u05da \u05de\u05e1\u05dc\u05d5\u05dc',
+    walkTime: '\u05d6\u05de\u05df \u05d4\u05dc\u05d9\u05db\u05d4',
+    miklatim: '\u05de\u05e7\u05dc\u05d8\u05d9\u05dd',
+    gapSegments: '\u05e7\u05d8\u05e2\u05d9\u05dd \u05d7\u05e9\u05d5\u05e4\u05d9\u05dd',
+    exposedDist: '\u05de\u05e8\u05d7\u05e7 \u05d7\u05e9\u05d5\u05e3',
+    dragHint: '\u270b \u05d2\u05e8\u05e8\u05d5 \u05d0\u05ea \u05d4\u05de\u05e1\u05dc\u05d5\u05dc \u05d1\u05de\u05e4\u05d4 \u05db\u05d3\u05d9 \u05dc\u05d4\u05ea\u05d0\u05d9\u05dd \u05d9\u05d3\u05e0\u05d9\u05ea. \u05d4\u05db\u05d9\u05e1\u05d5\u05d9 \u05d9\u05ea\u05e2\u05d3\u05db\u05df \u05d1\u05d6\u05de\u05df \u05d0\u05de\u05ea.',
+    coverageGaps: '\u26a0 \u05e4\u05e2\u05e8\u05d9 \u05db\u05d9\u05e1\u05d5\u05d9',
+    miklatimOnRoute: '\u05de\u05e7\u05dc\u05d8\u05d9\u05dd \u05d1\u05de\u05e1\u05dc\u05d5\u05dc',
+    safetyNoticeLabel: '\u26a0 \u05e9\u05d9\u05de\u05d5 \u05dc\u05d1:',
+    safetyNoticeText: '\u05e0\u05ea\u05d5\u05e0\u05d9 \u05d4\u05de\u05e7\u05dc\u05d8\u05d9\u05dd \u05de\u05de\u05e7\u05d5\u05e8\u05d5\u05ea GIS \u05e2\u05d9\u05e8\u05d5\u05e0\u05d9\u05d9\u05dd. \u05d4\u05db\u05d9\u05e1\u05d5\u05d9 \u05e2\u05e9\u05d5\u05d9 \u05dc\u05d4\u05d9\u05d5\u05ea \u05d7\u05dc\u05e7\u05d9 \u05d0\u05d5 \u05dc\u05d0 \u05e2\u05d3\u05db\u05e0\u05d9. \u05ea\u05de\u05d9\u05d3 \u05d5\u05d3\u05d0\u05d5 \u05d0\u05ea \u05de\u05d9\u05e7\u05d5\u05dd \u05d4\u05de\u05e7\u05dc\u05d8\u05d9\u05dd \u05d1\u05e9\u05d8\u05d7 \u05d5\u05e4\u05e2\u05dc\u05d5 \u05dc\u05e4\u05d9 \u05d4\u05e0\u05d7\u05d9\u05d5\u05ea \u05e4\u05d9\u05e7\u05d5\u05d3 \u05d4\u05e2\u05d5\u05e8\u05e3 \u05d1\u05d7\u05d9\u05e8\u05d5\u05dd.',
+    emptyText: '\u05d4\u05d6\u05d9\u05e0\u05d5 \u05e0\u05e7\u05d5\u05d3\u05ea \u05d4\u05ea\u05d7\u05dc\u05d4 \u05d5\u05d9\u05e2\u05d3 \u05d1\u05d9\u05e9\u05e8\u05d0\u05dc.<br/>\u05d4\u05d0\u05e4\u05dc\u05d9\u05e7\u05e6\u05d9\u05d4 \u05ea\u05de\u05e6\u05d0 \u05de\u05e1\u05dc\u05d5\u05dc \u05d4\u05dc\u05d9\u05db\u05d4 \u05e9\u05d9\u05e9\u05de\u05d5\u05e8 \u05d0\u05ea\u05db\u05dd \u05d1\u05d8\u05d5\u05d5\u05d7 \u05de\u05e7\u05dc\u05d8 \u05d1\u05db\u05dc \u05e8\u05d2\u05e2.',
+    legend: '\u05de\u05e7\u05e8\u05d0',
+    legStart: '\u05e0\u05e7\u05d5\u05d3\u05ea \u05d4\u05ea\u05d7\u05dc\u05d4',
+    legEnd: '\u05e0\u05e7\u05d5\u05d3\u05ea \u05e1\u05d9\u05d5\u05dd',
+    legMiklat: '\u05de\u05e7\u05dc\u05d8',
+    legSafe: '\u05de\u05e1\u05dc\u05d5\u05dc \u05de\u05d5\u05d2\u05df',
+    legGap: '\u05e4\u05e2\u05e8 \u05db\u05d9\u05e1\u05d5\u05d9',
+    legRadius: '\u05e8\u05d3\u05d9\u05d5\u05e1 \u05de\u05e7\u05dc\u05d8',
+    legDrag: '\u270b \u05d2\u05e8\u05e8\u05d5 \u05de\u05e1\u05dc\u05d5\u05dc \u05dc\u05d4\u05ea\u05d0\u05de\u05d4',
+    showRadius: '\u05d4\u05e6\u05d2 \u05e8\u05d3\u05d9\u05d5\u05e1 \u05de\u05e7\u05dc\u05d8',
+    statusEnterBoth: '\u05d4\u05d6\u05d9\u05e0\u05d5 \u05e0\u05e7\u05d5\u05d3\u05ea \u05d4\u05ea\u05d7\u05dc\u05d4 \u05d5\u05d9\u05e2\u05d3.',
+    statusLoadingConfig: '\u05d8\u05d5\u05e2\u05df \u05d4\u05d2\u05d3\u05e8\u05d5\u05ea\u2026',
+    statusConfigErr: '\u05dc\u05d0 \u05e0\u05d9\u05ea\u05df \u05dc\u05d8\u05e2\u05d5\u05df \u05d4\u05d2\u05d3\u05e8\u05d5\u05ea API. \u05d4\u05d0\u05dd GOOGLE_MAPS_API_KEY \u05de\u05d5\u05d2\u05d3\u05e8?',
+    statusLoadingMaps: '\u05d8\u05d5\u05e2\u05df \u05de\u05e4\u05d5\u05ea \u05d2\u05d5\u05d2\u05dc\u2026',
+    statusGettingRoute: '\u05de\u05d7\u05e9\u05d1 \u05de\u05e1\u05dc\u05d5\u05dc \u05d4\u05dc\u05d9\u05db\u05d4\u2026',
+    statusFetchingShelters: function(city) { return '\u05de\u05d0\u05ea\u05e8 \u05de\u05e7\u05dc\u05d8\u05d9\u05dd \u05de' + city + '\u2026'; },
+    statusFoundShelters: function(n, tgt) { return '\u05e0\u05de\u05e6\u05d0\u05d5 ' + n + ' \u05de\u05e7\u05dc\u05d8\u05d9\u05dd. \u05de\u05d9\u05d9\u05e2\u05dc \u05dc\u05db\u05d9\u05e1\u05d5\u05d9 ' + tgt + '%\u2026'; },
+    statusRoutingWaypoints: function(iter, n) { return '\u05d0\u05d9\u05d8\u05e8\u05e6\u05d9\u05d4 ' + iter + ': \u05de\u05ea\u05d5\u05d5\u05d4 \u05de\u05e1\u05dc\u05d5\u05dc \u05d3\u05e8\u05da ' + n + ' \u05de\u05e7\u05dc\u05d8\u05d9\u05dd\u2026'; },
+    statusBestAchievable: function(pct, tgt) { return '\u05de\u05d9\u05d8\u05d1\u05d9 \u05d0\u05e4\u05e9\u05e8\u05d9: ' + pct + '% (\u05d9\u05e2\u05d3: ' + tgt + '%). \u05d2\u05e8\u05e8\u05d5 \u05d0\u05ea \u05d4\u05de\u05e1\u05dc\u05d5\u05dc \u05dc\u05e9\u05d9\u05e4\u05d5\u05e8.'; },
+    statusCalcWalk: '\u05de\u05d7\u05e9\u05d1 \u05de\u05e8\u05d7\u05e7\u05d9 \u05d4\u05dc\u05d9\u05db\u05d4\u2026',
+    statusFullCoverage: '\u2713 \u05de\u05e1\u05dc\u05d5\u05dc \u05de\u05db\u05d5\u05e1\u05d4 \u05dc\u05d7\u05dc\u05d5\u05d8\u05d9\u05df',
+    statusMeetsTarget: function(pct, tgt) { return '\u2713 \u05db\u05d9\u05e1\u05d5\u05d9 ' + pct + '% \u05e2\u05d5\u05de\u05d3 \u05d1\u05d9\u05e2\u05d3 ' + tgt + '%'; },
+    statusPartialCoverage: function(pct) { return pct + '% \u05de\u05d4\u05de\u05e1\u05dc\u05d5\u05dc \u05d1\u05d8\u05d5\u05d5\u05d7 \u05de\u05e7\u05dc\u05d8'; },
+    gapLabel: function(i, dist, min) { return '<strong>\u05e4\u05e2\u05e8 ' + i + '</strong> \u2014 ' + dist + ' \u05de\u05f3 \u05dc\u05dc\u05d0 \u05de\u05e7\u05dc\u05d8 \u05d1\u05d8\u05d5\u05d5\u05d7 (~' + min + ' \u05d3\u05e7\u05f3 \u05d7\u05e9\u05d5\u05e4\u05d5\u05ea)'; },
+    rateThisShelter: '\u05d3\u05e8\u05d2\u05d5 \u05de\u05e7\u05dc\u05d8 \u05d6\u05d4',
+    submitBtn: '\u05e9\u05dc\u05d7',
+    phReview: '\u05d1\u05d9\u05e7\u05d5\u05e8\u05ea \u05d0\u05d5\u05e4\u05e6\u05d9\u05d5\u05e0\u05dc\u05d9\u05ea (\u05e2\u05d3 500 \u05ea\u05d5\u05d5\u05d9\u05dd)',
+    routeWaypoint: '\u2605 \u05ea\u05d7\u05e0\u05ea \u05de\u05e1\u05dc\u05d5\u05dc',
+    thankYou: '!\u05ea\u05d5\u05d3\u05d4',
+    errorRetry: '\u05e9\u05d2\u05d9\u05d0\u05d4 \u2014 \u05e0\u05e1\u05d5 \u05e9\u05d5\u05d1',
+    geoNotSupported: '\u05d4\u05d3\u05e4\u05d3\u05e4\u05df \u05e9\u05dc\u05da \u05d0\u05d9\u05e0\u05d5 \u05ea\u05d5\u05de\u05da \u05d1\u05de\u05d9\u05e7\u05d5\u05dd.',
+    locating: '\u05de\u05d0\u05ea\u05e8\u2026',
+    myLocation: '\u05d4\u05de\u05d9\u05e7\u05d5\u05dd \u05e9\u05dc\u05d9',
+    swapTooltip: '\u05d4\u05d7\u05dc\u05e3 \u05de\u05d5\u05e6\u05d0 \u05d5\u05d9\u05e2\u05d3',
+    useCurrentLocation: '\u05d4\u05e9\u05ea\u05de\u05e9 \u05d1\u05de\u05d9\u05e7\u05d5\u05dd \u05d4\u05e0\u05d5\u05db\u05d7\u05d9',
+  }
+};
+
+App.currentLang = 'en';
+
+App.t = function(key) {
+  return App.STRINGS[App.currentLang][key] || App.STRINGS.en[key] || key;
+};
+
+App.setLang = function(lang) {
+  App.currentLang = lang;
+  document.getElementById('langSel').value = lang;
+  var mobileLang = document.getElementById('mobileLangSel');
+  if (mobileLang) mobileLang.value = lang;
+  document.documentElement.lang = lang;
+  document.body.classList.toggle('he', lang === 'he');
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    var val = App.t(el.dataset.i18n);
+    if (typeof val === 'string') el.innerHTML = val;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+    var val = App.t(el.dataset.i18nPlaceholder);
+    if (typeof val === 'string') el.placeholder = val;
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(function(el) {
+    var val = App.t(el.dataset.i18nTitle);
+    if (typeof val === 'string') el.title = val;
+  });
+  localStorage.setItem('miklat-lang', lang);
+  App.mapsReady = false;
+};
