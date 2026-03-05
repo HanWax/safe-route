@@ -42,6 +42,11 @@ App.initMap = function() {
 
   App.map.addListener('click', function() { App.closeAllIW(); });
 
+  // Right-click to add community miklat (always available once map loads)
+  App.map.addListener('rightclick', function(e) {
+    if (App.handleMapRightClick) App.handleMapRightClick(e);
+  });
+
   ['origin','dest','mobileOrigin','mobileDest'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
@@ -101,13 +106,19 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
   var usedIds = new Set(usedShelters.map(function(s) { return s.id; }));
   shelters.forEach(function(s, i) {
     var isWaypoint = usedIds.has(s.id);
+    var isCommunity = s.community === true;
+    var markerColor = isCommunity ? '#E88A1A' : '#1A4DE8';
+    var esc = App.escapeHtml || function(x) { return x; };
+    var displayName = isCommunity ? esc(s.type || s.name) : (s.type || s.name);
+    var displayAddr = isCommunity ? esc(s.addr) : s.addr;
+    var displayNotes = isCommunity && s.notes ? esc(s.notes) : s.notes;
     var marker = new google.maps.Marker({
       position: s.location, map: App.map,
       title: s.name,
       icon: {
         path: google.maps.SymbolPath.CIRCLE,
         scale: isWaypoint ? 10 : 7,
-        fillColor: '#1A4DE8',
+        fillColor: markerColor,
         fillOpacity: 1,
         strokeColor: isWaypoint ? '#0f0f0f' : '#fff',
         strokeWeight: isWaypoint ? 2.5 : 1.5,
@@ -122,13 +133,17 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
     var areaStr = s.area ? '<br><span style="color:#888;font-size:10px">' + s.area + ' \u05de\u05f4\u05e8</span>' : '';
     var filtStr = s.filtration && s.filtration !== '\u05dc\u05dc\u05d0 \u05de\u05e2\u05e8\u05db\u05ea \u05e1\u05d9\u05e0\u05d5\u05df'
       ? '<br><span style="color:#1565c0;font-size:10px">\ud83d\udee1 ' + s.filtration + '</span>' : '';
-    var notesStr = s.notes
-      ? '<div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee;font-size:10px;color:#666;direction:rtl;text-align:right;max-width:240px">' + s.notes + '</div>' : '';
+    var notesStr = displayNotes
+      ? '<div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee;font-size:10px;color:#666;direction:rtl;text-align:right;max-width:240px">' + displayNotes + '</div>' : '';
+
+    var communityBadgeHtml = isCommunity
+      ? '<div style="margin-bottom:4px"><span style="background:#E88A1A;color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">' + App.t('communityBadge') + '</span></div>' : '';
 
     var iw = new google.maps.InfoWindow({
       content: '<div style="font-family:\'DM Mono\',monospace;font-size:12px;padding:2px 4px;max-width:280px">' +
-        '<b style="font-family:\'Syne\',sans-serif;font-size:13px">' + (s.type || s.name) + '</b>' +
-        (s.addr ? '<br><span style="color:#888">' + s.addr + '</span>' : '') +
+        communityBadgeHtml +
+        '<b style="font-family:\'Syne\',sans-serif;font-size:13px">' + displayName + '</b>' +
+        (displayAddr ? '<br><span style="color:#888">' + displayAddr + '</span>' : '') +
         '<br><span style="color:#1A4DE8;font-size:11px">' + (isWaypoint ? App.t('routeWaypoint') : '\u05de\u05e7\u05dc\u05d8 #' + (s.ms_miklat || '')) + '</span>' +
         areaStr + filtStr +
         '<br>' + statusBadge + ' ' + accessBadge +
@@ -225,6 +240,10 @@ App.clearAll = function() {
   App.shelterCircles.forEach(function(c) { c.setMap(null); });
   App.shelterCircles = [];
   App.shelterRatings = {};
+  if (App.communityMarkers) {
+    App.communityMarkers.forEach(function(o) { if (o.setMap) o.setMap(null); else if (o.close) o.close(); });
+    App.communityMarkers = [];
+  }
   if (App.dirRenderer) App.dirRenderer.setDirections({ routes: [] });
   if (App.draggableRenderer) {
     App.draggableRenderer.setMap(null);

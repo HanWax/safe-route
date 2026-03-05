@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const { shelters } = req.query;
   if (!shelters) return res.status(400).json({ error: 'shelters param required' });
 
-  const ids = shelters.split(',').filter(id => /^tlv-\d+$/.test(id));
+  const ids = shelters.split(',').filter(id => /^[a-z]{2,6}-\d+$/.test(id));
   if (!ids.length) return res.status(400).json({ error: 'No valid shelter IDs' });
 
   try {
