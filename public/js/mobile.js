@@ -86,7 +86,7 @@ App.initBottomSheet = function() {
     App.setSheetPosition(closest.state);
   });
 
-  App.setSheetPosition('peek', false);
+  App.setSheetPosition('half', false);
 
   // Show welcome/example content
   App.showMobileWelcome();
