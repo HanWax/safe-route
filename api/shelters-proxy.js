@@ -13,13 +13,21 @@ export default async function handler(req, res) {
 
   try {
     const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'en-US,en;q=0.9,he;q=0.8',
     };
     if (parsed.hostname === 'gisviewer.jerusalem.muni.il') {
       headers['Referer'] = 'https://jergisng.jerusalem.muni.il/';
+      headers['Origin'] = 'https://jergisng.jerusalem.muni.il';
     }
-    const fetchOpts = { headers };
-    const resp = await fetch(url, fetchOpts);
+    // Use POST with form-encoded body for ArcGIS queries (more reliable than long GET URLs)
+    const queryString = parsed.search?.slice(1);
+    const baseUrl = `${parsed.origin}${parsed.pathname}`;
+    const fetchOpts = queryString
+      ? { method: 'POST', headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' }, body: queryString }
+      : { headers };
+    const resp = await fetch(queryString ? baseUrl : url, fetchOpts);
     if (!resp.ok) {
       return res.status(resp.status).json({ error: `Upstream returned ${resp.status}` });
     }
