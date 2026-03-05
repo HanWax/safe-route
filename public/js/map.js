@@ -108,10 +108,10 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
     var isWaypoint = usedIds.has(s.id);
     var isCommunity = s.community === true;
     var markerColor = isCommunity ? '#E88A1A' : '#1A4DE8';
-    var esc = App.escapeHtml || function(x) { return x; };
-    var displayName = isCommunity ? esc(s.type || s.name) : (s.type || s.name);
-    var displayAddr = isCommunity ? esc(s.addr) : s.addr;
-    var displayNotes = isCommunity && s.notes ? esc(s.notes) : s.notes;
+    var esc = App.escapeHtml;
+    var displayName = esc(s.type || s.name || '');
+    var displayAddr = esc(s.addr || '');
+    var displayNotes = s.notes ? esc(s.notes) : '';
     var marker = new google.maps.Marker({
       position: s.location, map: App.map,
       title: s.name,
@@ -129,10 +129,10 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
     var accessBadge = s.accessible === '\u05db\u05df'
       ? '<span style="color:#2e7d32;font-size:10px">\u267f \u05e0\u05d2\u05d9\u05e9</span>' : '';
     var statusBadge = s.status
-      ? '<span style="color:' + (s.status === '\u05db\u05e9\u05d9\u05e8 \u05dc\u05e9\u05d9\u05de\u05d5\u05e9' ? '#2e7d32' : '#D93B22') + ';font-size:10px">' + s.status + '</span>' : '';
-    var areaStr = s.area ? '<br><span style="color:#888;font-size:10px">' + s.area + ' \u05de\u05f4\u05e8</span>' : '';
+      ? '<span style="color:' + (s.status === '\u05db\u05e9\u05d9\u05e8 \u05dc\u05e9\u05d9\u05de\u05d5\u05e9' ? '#2e7d32' : '#D93B22') + ';font-size:10px">' + esc(s.status) + '</span>' : '';
+    var areaStr = s.area ? '<br><span style="color:#888;font-size:10px">' + esc(String(s.area)) + ' \u05de\u05f4\u05e8</span>' : '';
     var filtStr = s.filtration && s.filtration !== '\u05dc\u05dc\u05d0 \u05de\u05e2\u05e8\u05db\u05ea \u05e1\u05d9\u05e0\u05d5\u05df'
-      ? '<br><span style="color:#1565c0;font-size:10px">\ud83d\udee1 ' + s.filtration + '</span>' : '';
+      ? '<br><span style="color:#1565c0;font-size:10px">\ud83d\udee1 ' + esc(s.filtration) + '</span>' : '';
     var notesStr = displayNotes
       ? '<div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee;font-size:10px;color:#666;direction:rtl;text-align:right;max-width:240px">' + displayNotes + '</div>' : '';
 
@@ -175,7 +175,7 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
       var rDiv = document.querySelector('.iw-reviews[data-shelter="' + s.id + '"]');
       if (rDiv && r && r.reviews.length) {
         rDiv.innerHTML = r.reviews.slice(0, 3).map(function(rv) {
-          return '<div class="iw-review"><span class="iw-r-stars">' + App.renderStars(rv.rating) + '</span> ' + (rv.text ? rv.text : '') + '</div>';
+          return '<div class="iw-review"><span class="iw-r-stars">' + App.renderStars(rv.rating) + '</span> ' + (rv.text ? App.escapeHtml(rv.text) : '') + '</div>';
         }).join('');
       }
       var starInput = document.querySelector('.star-input[data-shelter="' + s.id + '"]');

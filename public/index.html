@@ -15,7 +15,7 @@
     Miklat Route
     <span class="logo-he">מקלט</span>
   </div>
-  <select id="langSel" onchange="setLang(this.value)">
+  <select id="langSel" onchange="setLang(this.value)" aria-label="Language">
     <option value="en">EN</option>
     <option value="he">עב</option>
   </select>
@@ -53,7 +53,7 @@
 
       <div class="radius-row">
         <label data-i18n="maxGap">Max gap from miklat</label>
-        <select id="radius">
+        <select id="radius" aria-label="Max gap from miklat">
           <option value="200" data-i18n="rad200">2 min (~200m)</option>
           <option value="400" selected data-i18n="rad400">5 min (~400m)</option>
           <option value="600" data-i18n="rad600">7 min (~600m)</option>
@@ -151,8 +151,31 @@
       </div>
 
       <div class="empty" id="emptyState">
-        <div class="empty-icon">🗺️</div>
-        <div class="empty-txt" data-i18n="emptyText">Enter a start and end point in Israel.<br/>The app will find a walking route that keeps you within reach of a מקלט at all times.</div>
+        <div class="empty-icon">🛡</div>
+        <div class="empty-txt" data-i18n="emptyWhat">A <strong>miklat</strong> (מקלט) is a bomb shelter. This app plans walking routes that keep you close to one at all times.</div>
+        <div class="empty-steps">
+          <div class="empty-step">
+            <div class="empty-step-num">1</div>
+            <span data-i18n="emptyStep1">Enter start & end</span>
+          </div>
+          <div class="empty-step-arrow">→</div>
+          <div class="empty-step">
+            <div class="empty-step-num">2</div>
+            <span data-i18n="emptyStep2">See shelter coverage</span>
+          </div>
+          <div class="empty-step-arrow">→</div>
+          <div class="empty-step">
+            <div class="empty-step-num">3</div>
+            <span data-i18n="emptyStep3">Drag to adjust</span>
+          </div>
+        </div>
+        <div class="empty-divider"></div>
+        <div class="empty-examples-label" data-i18n="tryExample">Try an example route</div>
+        <div class="empty-examples">
+          <button class="example-chip" onclick="App.loadExample('tlv')" data-i18n="exampleTlv">Tel Aviv: Dizengoff → Rothschild</button>
+          <button class="example-chip" onclick="App.loadExample('jer')" data-i18n="exampleJer">Jerusalem: Jaffa Gate → Mahane Yehuda</button>
+          <button class="example-chip" onclick="App.loadExample('haifa')" data-i18n="exampleHaifa">Haifa: Carmel Center → Port</button>
+        </div>
       </div>
 
     </div>
@@ -170,7 +193,7 @@
             <div class="logo-shield">🛡</div>
             Miklat
           </div>
-          <select class="mobile-lang-sel" id="mobileLangSel" onchange="setLang(this.value)">
+          <select class="mobile-lang-sel" id="mobileLangSel" onchange="setLang(this.value)" aria-label="Language">
             <option value="en">EN</option>
             <option value="he">עב</option>
           </select>

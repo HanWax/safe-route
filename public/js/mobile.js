@@ -91,6 +91,29 @@ App.initBottomSheet = function() {
   });
 
   App.setSheetPosition('hidden', false);
+
+  // Show welcome content in bottom sheet
+  App.showMobileWelcome();
+};
+
+App.showMobileWelcome = function() {
+  var content = document.getElementById('bottomSheetContent');
+  if (!content) return;
+  content.innerHTML =
+    '<div style="text-align:center;padding:8px 0 4px">' +
+      '<div style="font-size:11px;color:var(--ink);line-height:1.7;max-width:260px;margin:0 auto">' +
+        App.t('emptyWhat') +
+      '</div>' +
+      '<div style="margin-top:14px;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:500">' +
+        App.t('tryExample') +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">' +
+        '<button class="example-chip" onclick="App.loadExample(\'tlv\')">' + App.t('exampleTlv') + '</button>' +
+        '<button class="example-chip" onclick="App.loadExample(\'jer\')">' + App.t('exampleJer') + '</button>' +
+        '<button class="example-chip" onclick="App.loadExample(\'haifa\')">' + App.t('exampleHaifa') + '</button>' +
+      '</div>' +
+    '</div>';
+  App.setSheetPosition('peek');
 };
 
 App.syncInputs = function() {

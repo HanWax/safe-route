@@ -7,6 +7,22 @@ App.setStatus = function(msg, type) {
   if (App.isMobile()) App.setMobileStatus(msg, type);
 };
 
+App._countUp = function(el, target, suffix, duration) {
+  suffix = suffix || '';
+  duration = duration || 600;
+  var start = 0;
+  var startTime = null;
+  function step(ts) {
+    if (!startTime) startTime = ts;
+    var progress = Math.min((ts - startTime) / duration, 1);
+    var eased = 1 - Math.pow(1 - progress, 3);
+    var current = Math.round(start + (target - start) * eased);
+    el.textContent = current + suffix;
+    if (progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+};
+
 App.setBusy = function(b) {
   var btn = document.getElementById('goBtn');
   btn.classList.toggle('loading', b);
@@ -21,13 +37,18 @@ App.renderScore = function(pct, gaps, route, shelterCount, coverageTarget) {
   wrap.classList.add('show');
 
   var el = document.getElementById('scorePct');
-  el.textContent = pct + '%';
   var meetsTarget = pct >= coverageTarget;
   el.className = 'score-pct ' + (meetsTarget ? (pct >= 99 ? 'full' : 'high') : pct >= 50 ? 'mid' : 'low');
+  App._countUp(el, pct, '%', 700);
 
   var bar = document.getElementById('scoreBar');
-  bar.style.width = pct + '%';
+  bar.style.width = '0%';
   bar.style.background = meetsTarget ? (pct >= 99 ? '#18C96A' : '#8BC34A') : pct >= 50 ? '#E8920F' : '#D93B22';
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      bar.style.width = pct + '%';
+    });
+  });
 
   var scoreLabel = document.getElementById('scoreLabel');
   if (scoreLabel) {
@@ -65,6 +86,7 @@ App.renderGaps = function(gaps) {
     var walkMin = Math.ceil(walkSec / 60);
     var div = document.createElement('div');
     div.className = 'gap-card';
+    div.style.animationDelay = (i * 60) + 'ms';
     div.innerHTML = App.t('gapLabel')(i+1, g.distMeters, walkMin);
     div.addEventListener('click', function() {
       var mid = g.points[Math.floor(g.points.length/2)];
@@ -114,24 +136,24 @@ App.renderShelterList = async function(shelters, path, radius) {
       ? wd.distance.text
       : '~' + Math.round(s.routeDist * App.WALK_FACTOR) + 'm';
 
-    var esc = App.escapeHtml || function(x) { return x; };
+    var esc = App.escapeHtml;
     var tagsHtml = '';
     var tags = [];
     if (s.community) tags.push('<span class="s-tag community">' + App.t('communityBadge') + '</span>');
-    if (s.type) tags.push('<span class="s-tag">' + s.type + '</span>');
+    if (s.type) tags.push('<span class="s-tag">' + esc(s.type) + '</span>');
     if (s.accessible === '\u05db\u05df') tags.push('<span class="s-tag accessible">\u267f \u05e0\u05d2\u05d9\u05e9</span>');
     if (s.filtration && s.filtration !== '\u05dc\u05dc\u05d0 \u05de\u05e2\u05e8\u05db\u05ea \u05e1\u05d9\u05e0\u05d5\u05df')
-      tags.push('<span class="s-tag filtered">\ud83d\udee1 ' + s.filtration + '</span>');
+      tags.push('<span class="s-tag filtered">\ud83d\udee1 ' + esc(s.filtration) + '</span>');
     if (s.status === '\u05db\u05e9\u05d9\u05e8 \u05dc\u05e9\u05d9\u05de\u05d5\u05e9')
       tags.push('<span class="s-tag status-ok">\u05db\u05e9\u05d9\u05e8</span>');
     else if (s.status)
-      tags.push('<span class="s-tag status-bad">' + s.status + '</span>');
-    if (s.area) tags.push('<span class="s-tag">' + s.area + ' \u05de\u05f4\u05e8</span>');
+      tags.push('<span class="s-tag status-bad">' + esc(s.status) + '</span>');
+    if (s.area) tags.push('<span class="s-tag">' + esc(String(s.area)) + ' \u05de\u05f4\u05e8</span>');
     if (tags.length) tagsHtml = '<div class="s-tags">' + tags.join('') + '</div>';
 
-    var cardName = s.community ? esc(s.addr || s.type || s.name) : (s.addr || s.type || s.name);
+    var cardName = esc(s.addr || s.type || s.name || '');
     var notesHtml = s.notes
-      ? '<div class="s-notes">' + (s.community ? esc(s.notes) : s.notes) + '</div>' : '';
+      ? '<div class="s-notes">' + esc(s.notes) + '</div>' : '';
 
     card.innerHTML =
       '<div class="s-card-row">' +
@@ -139,11 +161,12 @@ App.renderShelterList = async function(shelters, path, radius) {
         '<div class="s-name">' + cardName + '</div>' +
         '<div class="s-dist">' + walkMin + '\u2032 <span style="font-size:9px;color:var(--muted)">' + distLabel + '</span></div>' +
       '</div>' +
-      (s.addr && s.addrEng ? '<div class="s-addr">' + s.addrEng + '</div>' : '') +
+      (s.addr && s.addrEng ? '<div class="s-addr">' + esc(s.addrEng) + '</div>' : '') +
       tagsHtml +
       '<div class="s-rating" data-shelter="' + s.id + '"></div>' +
       notesHtml;
 
+    card.style.animationDelay = Math.min(i * 50, 400) + 'ms';
     card.addEventListener('click', function() {
       App.map.panTo(s.location); App.map.setZoom(17);
       App.closeAllIW();
@@ -189,6 +212,7 @@ App.fetchAndDisplayRatings = async function(shelterIds) {
 };
 
 App.submitReview = async function(shelterId, btn) {
+  if (btn.disabled) return;
   var form = btn.closest('.review-form');
   var stars = form.querySelectorAll('.star-input span.active');
   var rating = stars.length;
