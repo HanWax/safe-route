@@ -961,14 +961,15 @@ body.he .mobile-search-row input { padding: 10px 12px 10px 34px; }
 /* ==== MOBILE: BOTTOM SHEET ==== */
 .bottom-sheet {
   display: none;
-  position: absolute; top: 100%; left: 0; right: 0;
-  z-index: 45;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 100vh; height: 100dvh;
+  z-index: 100;
   background: var(--white);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   box-shadow: 0 -4px 20px rgba(15,15,15,0.12);
-  max-height: 85vh;
   transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: transform;
+  transform: translateY(100%);
 }
 .bottom-sheet.no-transition { transition: none; }
 .bottom-sheet .drag-handle {
@@ -1011,9 +1012,9 @@ body.he .mobile-search-row input { padding: 10px 12px 10px 34px; }
     display: flex; flex-direction: column;
   }
 
-  .map-wrap { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+  .map-wrap { flex: 1; min-height: 0; position: relative; }
   #map { width: 100%; height: 100%; z-index: 0; isolation: isolate; }
-  .bottom-sheet { display: flex; flex-direction: column; z-index: 100; }
+  .bottom-sheet { display: flex; flex-direction: column; }
   .community-bar { z-index: 120; }
   .community-form-overlay { z-index: 110; }
 
