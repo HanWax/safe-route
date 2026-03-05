@@ -75,6 +75,14 @@
         </label>
       </div>
 
+      <div class="toggle-row">
+        <label for="includeCommunity" data-i18n="includeCommunity">Include community miklatim</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="includeCommunity" checked/>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
       <button class="btn btn-community" id="addMiklatBtn" onclick="startAddMiklat()">
         <span data-i18n="addMiklat">Add community-reported miklat</span>
       </button>
@@ -220,6 +228,13 @@
           <label for="mobileShowRadius" style="font-size:10px" data-i18n="showRadius">Show shelter radius</label>
           <label class="toggle-switch">
             <input type="checkbox" id="mobileShowRadius"/>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row" style="margin-top:4px">
+          <label for="mobileIncludeCommunity" style="font-size:10px" data-i18n="includeCommunity">Include community miklatim</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="mobileIncludeCommunity" checked/>
             <span class="toggle-slider"></span>
           </label>
         </div>

@@ -293,6 +293,20 @@ document.addEventListener('DOMContentLoaded', function() {
       toggleShelterCircles(mSrToggle.checked);
     });
   }
+
+  // Community toggle sync
+  var commToggle = document.getElementById('includeCommunity');
+  var mCommToggle = document.getElementById('mobileIncludeCommunity');
+  if (commToggle) {
+    commToggle.addEventListener('change', function() {
+      if (mCommToggle) mCommToggle.checked = commToggle.checked;
+    });
+  }
+  if (mCommToggle) {
+    mCommToggle.addEventListener('change', function() {
+      if (commToggle) commToggle.checked = mCommToggle.checked;
+    });
+  }
 });
 
 document.addEventListener('keydown', function(e) { if (e.key === 'Enter') App.run(); });

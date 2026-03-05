@@ -87,15 +87,18 @@ App.fetchShelters = async function(bbox, routePath) {
     console.warn(city.id + ' GIS fetch failed', e);
   }
 
-  // Merge community-reported shelters
-  try {
-    var commShelters = await App.fetchCommunityShelters(bbox);
-    commShelters.forEach(function(cs) {
-      cs.location = new google.maps.LatLng(cs.lat, cs.lng);
-      shelters.push(cs);
-    });
-  } catch (e) {
-    console.warn('community shelters merge failed', e);
+  // Merge community-reported shelters (if toggle is checked)
+  var includeCommunity = document.getElementById('includeCommunity');
+  if (!includeCommunity || includeCommunity.checked) {
+    try {
+      var commShelters = await App.fetchCommunityShelters(bbox);
+      commShelters.forEach(function(cs) {
+        cs.location = new google.maps.LatLng(cs.lat, cs.lng);
+        shelters.push(cs);
+      });
+    } catch (e) {
+      console.warn('community shelters merge failed', e);
+    }
   }
 
   return shelters;
