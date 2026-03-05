@@ -78,7 +78,6 @@ App._placeOrMoveMarker = function(latLng) {
 };
 
 App._showCommunityForm = function(isButtonMode) {
-  document.getElementById('communityBar').classList.remove('show');
   document.getElementById('communityFormOverlay').classList.add('show');
   document.getElementById('communityNameInput').value = '';
   document.getElementById('communityDescInput').value = '';
@@ -131,7 +130,6 @@ App._reverseGeocode = function(latLng) {
 
 App.cancelAddMiklat = function() {
   App.communityPlacementMode = false;
-  document.getElementById('communityBar').classList.remove('show');
   document.getElementById('communityFormOverlay').classList.remove('show');
   if (App.communityPlacementMarker) {
     App.communityPlacementMarker.setMap(null);
