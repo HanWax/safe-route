@@ -116,6 +116,16 @@ App.setMobileStatus = function(msg, type) {
   }
 };
 
+App.initMobileSettings = function() {
+  var toggle = document.getElementById('mobileSettingsToggle');
+  var panel = document.getElementById('mobileSettingsPanel');
+  if (!toggle || !panel) return;
+  toggle.addEventListener('click', function() {
+    var isOpen = panel.classList.toggle('open');
+    toggle.classList.toggle('open', isOpen);
+  });
+};
+
 App.populateBottomSheet = function() {
   var content = document.getElementById('bottomSheetContent');
   if (!content) return;
@@ -163,5 +173,14 @@ App.populateBottomSheet = function() {
       });
     });
     content.appendChild(clone);
+  }
+
+  // Move legend into bottom sheet on mobile
+  var legend = document.getElementById('legend');
+  if (legend && legend.classList.contains('show')) {
+    var legendClone = legend.cloneNode(true);
+    legendClone.id = 'mobileLegend';
+    legendClone.classList.add('mobile-legend-inline');
+    content.appendChild(legendClone);
   }
 };
