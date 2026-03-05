@@ -962,7 +962,7 @@ body.he .mobile-search-row input { padding: 10px 12px 10px 34px; }
 .bottom-sheet {
   display: none;
   flex-direction: column;
-  position: absolute; bottom: 0; left: 0; right: 0;
+  position: absolute; top: 100%; left: 0; right: 0;
   z-index: 45;
   background: var(--white);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;

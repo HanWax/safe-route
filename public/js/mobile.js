@@ -24,10 +24,10 @@ App.setSheetPosition = function(state, animate) {
   var vh = window.innerHeight;
   var translateY;
   switch (state) {
-    case 'peek': translateY = vh - App.SHEET_PEEK; break;
-    case 'half': translateY = vh * (1 - App.SHEET_HALF); break;
-    case 'full': translateY = vh * (1 - App.SHEET_FULL); break;
-    default:     translateY = vh; break;
+    case 'peek': translateY = -App.SHEET_PEEK; break;
+    case 'half': translateY = -vh * App.SHEET_HALF; break;
+    case 'full': translateY = -vh * App.SHEET_FULL; break;
+    default:     translateY = 0; break;
   }
   sheet.style.transform = 'translateY(' + translateY + 'px)';
 
@@ -54,7 +54,7 @@ App.initBottomSheet = function() {
   document.addEventListener('touchmove', function(e) {
     if (!dragging) return;
     var dy = e.touches[0].clientY - sheetStartY;
-    var newY = Math.max(window.innerHeight * (1 - App.SHEET_FULL), sheetStartTranslate + dy);
+    var newY = Math.min(-App.SHEET_PEEK, Math.max(-window.innerHeight * App.SHEET_FULL, sheetStartTranslate + dy));
     sheet.style.transform = 'translateY(' + newY + 'px)';
   }, { passive: true });
 
@@ -68,9 +68,9 @@ App.initBottomSheet = function() {
     var currentY = matrix.m42;
     var vh = window.innerHeight;
 
-    var peekY = vh - App.SHEET_PEEK;
-    var halfY = vh * (1 - App.SHEET_HALF);
-    var fullY = vh * (1 - App.SHEET_FULL);
+    var peekY = -App.SHEET_PEEK;
+    var halfY = -vh * App.SHEET_HALF;
+    var fullY = -vh * App.SHEET_FULL;
 
     var targets = [
       { state: 'full', y: fullY },
