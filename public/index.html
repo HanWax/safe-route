@@ -1583,9 +1583,8 @@ const CITY_CONFIGS = [
     name: 'Jerusalem',
     nameHe: 'ירושלים',
     center: { lat: 31.77, lng: 35.21 },
-    queryUrl: 'https://gisviewer.jerusalem.muni.il/arcgis/rest/services/BaseLayers/MapServer/91/query',
+    staticUrl: '/api/jerusalem-shelters',
     outFields: ['*'],
-    useProxy: true,
     parseFeat: (feat) => {
       const a = feat.attributes, g = feat.geometry;
       const lat = g.y, lon = g.x;
@@ -1899,9 +1898,14 @@ async function fetchShelters(bbox, routePath) {
       f: 'json',
     });
 
-    let fetchUrl = `${city.queryUrl}?${params}`;
-    if (city.useProxy) {
-      fetchUrl = `/api/shelters-proxy?url=${encodeURIComponent(fetchUrl)}`;
+    let fetchUrl;
+    if (city.staticUrl) {
+      fetchUrl = city.staticUrl;
+    } else {
+      fetchUrl = `${city.queryUrl}?${params}`;
+      if (city.useProxy) {
+        fetchUrl = `/api/shelters-proxy?url=${encodeURIComponent(fetchUrl)}`;
+      }
     }
 
     const resp = await fetch(fetchUrl);
