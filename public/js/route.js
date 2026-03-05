@@ -166,7 +166,8 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
     App.setStatus(App.t('statusRoutingWaypoints')(iteration + 1, selectedShelters.length), 'info');
 
     try {
-      var waypoints = selectedShelters.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
+      var orderedShelters = App.orderWaypointsAlongPath(selectedShelters, directRoute.path);
+      var waypoints = orderedShelters.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
       var wpRoute = await App.getRoute(orig, dest, waypoints);
       if (wpRoute) {
         var coverage = App.analyseRouteCoverage(wpRoute.path, shelters, radius);
@@ -215,7 +216,8 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   if (!waypointShelters.length) return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
 
   try {
-    var waypoints = waypointShelters.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
+    var orderedFallback = App.orderWaypointsAlongPath(waypointShelters, directRoute.path);
+    var waypoints = orderedFallback.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
     var wpRoute = await App.getRoute(orig, dest, waypoints);
     var pct = wpRoute ? App.analyseRouteCoverage(wpRoute.path, shelters, radius).coveredPct : 0;
     return { waypointRoute: wpRoute, usedShelters: waypointShelters, achievedPct: pct };
@@ -223,6 +225,22 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
     console.warn('Waypoint route failed, falling back', e);
     return { waypointRoute: directRoute, usedShelters: [], achievedPct: directCoverage.coveredPct };
   }
+};
+
+App.orderWaypointsAlongPath = function(shelters, path) {
+  return shelters.slice().sort(function(a, b) {
+    return App.projectOntoPath(a, path) - App.projectOntoPath(b, path);
+  });
+};
+
+App.projectOntoPath = function(shelter, path) {
+  var loc = new google.maps.LatLng(shelter.lat, shelter.lon);
+  var bestIdx = 0, bestDist = Infinity;
+  for (var i = 0; i < path.length; i++) {
+    var d = google.maps.geometry.spherical.computeDistanceBetween(loc, path[i]);
+    if (d < bestDist) { bestDist = d; bestIdx = i; }
+  }
+  return bestIdx;
 };
 
 App.analyseRouteCoverage = function(path, shelters, radius) {
