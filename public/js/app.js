@@ -7,8 +7,6 @@ App.mapObjects = [];
 App.shelterCircles = [];
 App.shelterRatings = {};
 App.geoLocations = { origin: null, dest: null };
-App.draggableRenderer = null;
-App.shelterListUpdateTimer = null;
 App.detectedCity = null;
 App.detectedCities = [];
 
@@ -201,7 +199,7 @@ App.run = async function() {
     App.clearAll();
     App.setStatus(App.t('statusGettingRoute'), 'info');
 
-    var directRoute = await App.getRoute(orig, dest);
+    var directRoute = await App.getRoute(orig, dest, null, { alternates: 5 });
     if (!directRoute) return;
     if (runId !== App._runId) return;
 
@@ -228,8 +226,6 @@ App.run = async function() {
     App.drawShelterMarkers(shelters, buildResult.usedShelters);
     App.drawEndpoints(finalRoute);
     App.fitAll(finalRoute, shelters);
-
-    App.setupDraggableRoute(finalRoute, shelters, radius);
 
     App.lastRouteShare = {
       startLocation: finalRoute.startLocation,
