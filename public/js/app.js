@@ -2,8 +2,6 @@ window.App = window.App || {};
 
 // Shared state
 App.map = null;
-App.dirSvc = null;
-App.dirRenderer = null;
 App.mapsReady = false;
 App.mapObjects = [];
 App.shelterCircles = [];
@@ -185,12 +183,20 @@ App.run = async function() {
       App.initMap();
     }
 
-    var orig = App.geoLocations.origin
-      ? new google.maps.LatLng(App.geoLocations.origin.lat, App.geoLocations.origin.lng)
-      : origText;
-    var dest = App.geoLocations.dest
-      ? new google.maps.LatLng(App.geoLocations.dest.lat, App.geoLocations.dest.lng)
-      : destText;
+    var origCoords = App.geoLocations.origin;
+    if (!origCoords) {
+      App.setStatus(App.t('statusGeocoding'), 'info');
+      origCoords = await App.nominatimGeocode(origText);
+      if (!origCoords) { App.setStatus(App.t('statusGeocodeFailed'), 'err'); App.setBusy(false); return; }
+    }
+    var destCoords = App.geoLocations.dest;
+    if (!destCoords) {
+      App.setStatus(App.t('statusGeocoding'), 'info');
+      destCoords = await App.nominatimGeocode(destText);
+      if (!destCoords) { App.setStatus(App.t('statusGeocodeFailed'), 'err'); App.setBusy(false); return; }
+    }
+    var orig = new google.maps.LatLng(origCoords.lat, origCoords.lng);
+    var dest = new google.maps.LatLng(destCoords.lat, destCoords.lng);
 
     App.clearAll();
     App.setStatus(App.t('statusGettingRoute'), 'info');
@@ -240,12 +246,11 @@ App.run = async function() {
 
     document.getElementById('legend').classList.add('show');
     document.getElementById('emptyState').style.display = 'none';
-    document.getElementById('dragHint').classList.add('show');
     App.showFirstRunTip();
 
     var pctLabel = analysis.coveredPct >= 99
       ? App.t('statusFullCoverage')
-      : App.t('statusPartialCoverage')(analysis.coveredPct);
+      : App.t('statusPartialCoverage')(Math.round(analysis.coveredPct));
     App.setStatus(pctLabel, analysis.coveredPct >= 99 ? 'ok' : analysis.coveredPct >= 70 ? 'info' : 'err');
 
     if (App.isMobile()) {
