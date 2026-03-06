@@ -259,42 +259,36 @@ App.getWalkingDistances = async function(origins, destinations) {
     var batchOrigins = origins.slice(i, end);
     var batchDests = destinations.slice(i, end);
 
-    var coords = [];
-    for (var j = 0; j < batchOrigins.length; j++) {
-      coords.push(batchOrigins[j].lng() + ',' + batchOrigins[j].lat());
-      coords.push(batchDests[j].lng() + ',' + batchDests[j].lat());
-    }
+    var sources = batchOrigins.map(function(o) { return { lat: o.lat(), lon: o.lng() }; });
+    var targets = batchDests.map(function(d) { return { lat: d.lat(), lon: d.lng() }; });
 
-    var sourceIndices = [];
-    var destIndices = [];
-    for (var j = 0; j < batchOrigins.length; j++) {
-      sourceIndices.push(j * 2);
-      destIndices.push(j * 2 + 1);
-    }
-
-    var url = 'https://router.project-osrm.org/table/v1/foot/'
-      + coords.join(';')
-      + '?sources=' + sourceIndices.join(';')
-      + '&destinations=' + destIndices.join(';')
-      + '&annotations=distance,duration';
+    var body = JSON.stringify({
+      sources: sources,
+      targets: targets,
+      costing: 'pedestrian',
+    });
 
     try {
-      var resp = await fetch(url);
+      var resp = await fetch('https://valhalla1.openstreetmap.de/sources_to_targets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: body,
+      });
       var data = await resp.json();
-      if (data.code === 'Ok') {
-        for (var j = 0; j < batchOrigins.length; j++) {
-          var dist = data.distances[j][j];
-          var dur = data.durations[j][j];
-          if (dist !== null && dur !== null) {
+      if (data.sources_to_targets) {
+        for (var j = 0; j < sources.length; j++) {
+          var cell = data.sources_to_targets[j][j];
+          if (cell && cell.distance !== null && cell.time !== null) {
+            var distM = Math.round(cell.distance * 1000);
             walkingData[i + j] = {
-              distance: { value: Math.round(dist), text: Math.round(dist) + ' m' },
-              duration: { value: Math.round(dur), text: Math.ceil(dur / 60) + ' mins' },
+              distance: { value: distM, text: distM + ' m' },
+              duration: { value: Math.round(cell.time), text: Math.ceil(cell.time / 60) + ' mins' },
             };
           }
         }
       }
     } catch (e) {
-      console.warn('OSRM batch failed', e);
+      console.warn('Valhalla batch failed', e);
     }
   }
   return walkingData;
