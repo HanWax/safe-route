@@ -227,6 +227,8 @@ App.run = async function() {
     App.drawEndpoints(finalRoute);
     App.fitAll(finalRoute, shelters);
 
+    App.setupDraggableRoute(orig, dest, finalRoute, shelters, radius);
+
     App.lastRouteShare = {
       startLocation: finalRoute.startLocation,
       endLocation: finalRoute.endLocation,
@@ -242,6 +244,7 @@ App.run = async function() {
 
     document.getElementById('legend').classList.add('show');
     document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('dragHint').classList.add('show');
     App.showFirstRunTip();
 
     var pctLabel = analysis.coveredPct >= 99

@@ -158,6 +158,13 @@ App.populateBottomSheet = function() {
     content.appendChild(clone);
   }
 
+  var dragHint = document.getElementById('dragHint');
+  if (dragHint && dragHint.classList.contains('show')) {
+    var clone = dragHint.cloneNode(true);
+    clone.id = 'mobileDragHint';
+    content.appendChild(clone);
+  }
+
   var shelterSection = document.getElementById('shelterSection');
   if (shelterSection && shelterSection.style.display !== 'none') {
     var clone = shelterSection.cloneNode(true);
