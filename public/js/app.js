@@ -337,34 +337,6 @@ App.showFirstRunTip = function() {
 // Share state
 App.lastRouteShare = null;
 
-App.buildGoogleMapsUrl = function() {
-  var share = App.lastRouteShare;
-  if (!share) return null;
-
-  var origin = share.startLocation.lat + ',' + share.startLocation.lng;
-  var dest = share.endLocation.lat + ',' + share.endLocation.lng;
-
-  var url = 'https://www.google.com/maps/dir/?api=1'
-    + '&origin=' + origin
-    + '&destination=' + dest
-    + '&travelmode=walking';
-
-  if (share.waypoints.length) {
-    var wpStr = share.waypoints.map(function(w) {
-      return w.lat + ',' + w.lon;
-    }).join('|');
-    url += '&waypoints=' + encodeURIComponent(wpStr);
-  }
-
-  return url;
-};
-
-App.shareToGoogleMaps = function() {
-  var url = App.buildGoogleMapsUrl();
-  if (!url) return;
-  window.open(url, '_blank', 'noopener');
-};
-
 App.buildShareUrl = function() {
   var share = App.lastRouteShare;
   if (!share) return null;
