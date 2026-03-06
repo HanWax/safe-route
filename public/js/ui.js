@@ -251,7 +251,6 @@ App.closestOnPath = function(point, path) {
 };
 
 App.getWalkingDistances = async function(origins, destinations) {
-  var service = new google.maps.DistanceMatrixService();
   var walkingData = new Array(origins.length).fill(null);
   var batchSize = 10;
 
@@ -260,26 +259,42 @@ App.getWalkingDistances = async function(origins, destinations) {
     var batchOrigins = origins.slice(i, end);
     var batchDests = destinations.slice(i, end);
 
-    var result = await new Promise(function(resolve) {
-      service.getDistanceMatrix({
-        origins: batchOrigins,
-        destinations: batchDests,
-        travelMode: google.maps.TravelMode.WALKING,
-      }, function(response, status) {
-        resolve(status === 'OK' ? response : null);
-      });
-    });
+    var coords = [];
+    for (var j = 0; j < batchOrigins.length; j++) {
+      coords.push(batchOrigins[j].lng() + ',' + batchOrigins[j].lat());
+      coords.push(batchDests[j].lng() + ',' + batchDests[j].lat());
+    }
 
-    if (result) {
-      for (var j = 0; j < result.rows.length; j++) {
-        var element = result.rows[j].elements[j];
-        if (element && element.status === 'OK') {
-          walkingData[i + j] = {
-            distance: element.distance,
-            duration: element.duration,
-          };
+    var sourceIndices = [];
+    var destIndices = [];
+    for (var j = 0; j < batchOrigins.length; j++) {
+      sourceIndices.push(j * 2);
+      destIndices.push(j * 2 + 1);
+    }
+
+    var url = 'https://router.project-osrm.org/table/v1/foot/'
+      + coords.join(';')
+      + '?sources=' + sourceIndices.join(';')
+      + '&destinations=' + destIndices.join(';')
+      + '&annotations=distance,duration';
+
+    try {
+      var resp = await fetch(url);
+      var data = await resp.json();
+      if (data.code === 'Ok') {
+        for (var j = 0; j < batchOrigins.length; j++) {
+          var dist = data.distances[j][j];
+          var dur = data.durations[j][j];
+          if (dist !== null && dur !== null) {
+            walkingData[i + j] = {
+              distance: { value: Math.round(dist), text: Math.round(dist) + ' m' },
+              duration: { value: Math.round(dur), text: Math.ceil(dur / 60) + ' mins' },
+            };
+          }
         }
       }
+    } catch (e) {
+      console.warn('OSRM batch failed', e);
     }
   }
   return walkingData;
