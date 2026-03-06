@@ -1,42 +1,59 @@
 window.App = window.App || {};
 
+App._formatDistance = function(meters) {
+  return meters >= 1000 ? (meters / 1000).toFixed(1) + ' km' : Math.round(meters) + ' m';
+};
+
+App._formatDuration = function(seconds) {
+  var mins = Math.round(seconds / 60);
+  if (mins < 60) return mins + ' min';
+  return Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min';
+};
+
 App.getRoute = function(origin, destination, waypoints) {
-  return new Promise(function(res) {
-    var req = {
-      origin: origin,
-      destination: destination,
-      travelMode: google.maps.TravelMode.WALKING,
-    };
-    if (waypoints && waypoints.length) {
-      req.waypoints = waypoints.map(function(w) { return { location: w, stopover: false }; });
-      req.optimizeWaypoints = false;
-    }
-    App.dirSvc.route(req, function(result, status) {
-      if (status !== 'OK') {
-        App.setStatus('Route error: ' + status, 'err');
-        return res(null);
-      }
-      var leg0 = result.routes[0].legs[0];
-      var lastLeg = result.routes[0].legs[result.routes[0].legs.length - 1];
-      var allPoints = [];
-      result.routes[0].legs.forEach(function(leg) {
-        leg.steps.forEach(function(step) {
-          var pts = google.maps.geometry.encoding.decodePath(step.polyline.points);
-          allPoints = allPoints.concat(pts);
-        });
-      });
-      res({
-        result: result,
-        path: allPoints,
-        distance: leg0.distance.text,
-        duration: leg0.duration.text,
-        totalDistance: result.routes[0].legs.reduce(function(s, l) { return s + l.distance.value; }, 0),
-        totalDuration: result.routes[0].legs.reduce(function(s, l) { return s + l.duration.value; }, 0),
-        startLocation: leg0.start_location,
-        endLocation: lastLeg.end_location,
-      });
+  // Build OSRM coordinate string: lng,lat;lng,lat;...
+  var coords = [];
+  coords.push(origin.lng + ',' + origin.lat);
+  if (waypoints && waypoints.length) {
+    waypoints.forEach(function(w) {
+      coords.push(w.lng + ',' + w.lat);
     });
-  });
+  }
+  coords.push(destination.lng + ',' + destination.lat);
+
+  var url = 'https://router.project-osrm.org/route/v1/foot/' + coords.join(';') +
+    '?overview=full&geometries=geojson&steps=true';
+
+  return fetch(url)
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.code !== 'Ok' || !data.routes || !data.routes.length) {
+        App.setStatus('Route error: ' + (data.code || 'no route found'), 'err');
+        return null;
+      }
+
+      var route = data.routes[0];
+      var allPoints = route.geometry.coordinates.map(function(c) {
+        return L.latLng(c[1], c[0]);
+      });
+
+      var totalDistance = route.distance; // meters
+      var totalDuration = route.duration; // seconds
+
+      return {
+        path: allPoints,
+        distance: App._formatDistance(totalDistance),
+        duration: App._formatDuration(totalDuration),
+        totalDistance: Math.round(totalDistance),
+        totalDuration: Math.round(totalDuration),
+        startLocation: allPoints[0],
+        endLocation: allPoints[allPoints.length - 1],
+      };
+    })
+    .catch(function(err) {
+      App.setStatus('Route error: ' + err.message, 'err');
+      return null;
+    });
 };
 
 App._fetchCityShelters = async function(city, bbox) {
@@ -77,7 +94,7 @@ App._fetchCityShelters = async function(city, bbox) {
     if (!parsed) return;
     shelters.push(Object.assign({}, parsed, {
       source: city.id,
-      location: new google.maps.LatLng(parsed.lat, parsed.lon),
+      location: L.latLng(parsed.lat, parsed.lon),
     }));
   });
 
@@ -90,7 +107,6 @@ App.fetchShelters = async function(bbox, routePath) {
   App.detectedCity = cities[0];
   var shelters = [];
 
-  // Fetch from all matching cities in parallel
   var results = await Promise.allSettled(
     cities.map(function(city) { return App._fetchCityShelters(city, bbox); })
   );
@@ -103,13 +119,12 @@ App.fetchShelters = async function(bbox, routePath) {
     }
   });
 
-  // Merge community-reported shelters (if toggle is checked)
   var includeCommunity = document.getElementById('includeCommunity');
   if (!includeCommunity || includeCommunity.checked) {
     try {
       var commShelters = await App.fetchCommunityShelters(bbox);
       commShelters.forEach(function(cs) {
-        cs.location = new google.maps.LatLng(cs.lat, cs.lng);
+        cs.location = L.latLng(cs.lat, cs.lng);
         shelters.push(cs);
       });
     } catch (e) {
@@ -147,7 +162,6 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   var selectedShelters = [];
   var MAX_WAYPOINTS = 23;
   var MAX_ITERATIONS = 3;
-  // Reject detours that add more exposed distance than they save
   var MAX_DETOUR_RATIO = 1.5;
   var directDist = directRoute.totalDistance;
 
@@ -163,7 +177,7 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
       .map(function(s) {
         var coverCount = 0;
         for (var j = 0; j < currentGapPoints.length; j++) {
-          if (google.maps.geometry.spherical.computeDistanceBetween(currentGapPoints[j], s.location) <= effectiveRadius * 2) {
+          if (currentGapPoints[j].distanceTo(s.location) <= effectiveRadius * 2) {
             coverCount++;
           }
         }
@@ -191,12 +205,10 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
 
     try {
       var orderedShelters = App.orderWaypointsAlongPath(selectedShelters, directRoute.path);
-      var waypoints = orderedShelters.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
+      var waypoints = orderedShelters.map(function(s) { return L.latLng(s.lat, s.lon); });
       var wpRoute = await App.getRoute(orig, dest, waypoints);
       if (wpRoute) {
-        // Reject routes that are too long compared to the direct path
         if (wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {
-          // Revert to previous best and stop adding waypoints
           selectedShelters.length = 0;
           bestShelters.forEach(function(s) { selectedShelters.push(s); });
           usedIds.clear();
@@ -205,7 +217,6 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
         }
         var coverage = App.analyseRouteCoverage(wpRoute.path, shelters, radius);
         var newGapDist = coverage.gapDist || 0;
-        // Accept route only if it reduces total exposed (uncovered) meters
         if (newGapDist < bestGapDist) {
           bestRoute = wpRoute;
           bestGapDist = newGapDist;
@@ -233,13 +244,13 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
     return { waypointRoute: bestRoute, usedShelters: bestShelters, achievedPct: bestPct };
   }
 
-  // Fallback: single-pass nearest-shelter approach (only close shelters)
+  // Fallback: single-pass nearest-shelter approach
   var waypointShelterSet = new Set();
   var waypointShelters = [];
   for (var gi = 0; gi < gapPoints.length; gi++) {
     var nearest = null, nearestD = Infinity;
     for (var si = 0; si < shelters.length; si++) {
-      var d = google.maps.geometry.spherical.computeDistanceBetween(gapPoints[gi], shelters[si].location);
+      var d = gapPoints[gi].distanceTo(shelters[si].location);
       if (d < nearestD) { nearestD = d; nearest = shelters[si]; }
     }
     if (nearest && !waypointShelterSet.has(nearest.id) && nearestD < (radius * 2) / App.WALK_FACTOR) {
@@ -253,14 +264,13 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
 
   try {
     var orderedFallback = App.orderWaypointsAlongPath(waypointShelters, directRoute.path);
-    var waypoints = orderedFallback.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
+    var waypoints = orderedFallback.map(function(s) { return L.latLng(s.lat, s.lon); });
     var wpRoute = await App.getRoute(orig, dest, waypoints);
     if (wpRoute && wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {
       return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
     }
     var fallbackCoverage = wpRoute ? App.analyseRouteCoverage(wpRoute.path, shelters, radius) : null;
     var fallbackGapDist = fallbackCoverage ? (fallbackCoverage.gapDist || 0) : Infinity;
-    // Only use fallback route if it actually reduces exposed distance
     if (fallbackGapDist < directGapDist) {
       return { waypointRoute: wpRoute, usedShelters: waypointShelters, achievedPct: fallbackCoverage.coveredPct };
     }
@@ -278,10 +288,10 @@ App.orderWaypointsAlongPath = function(shelters, path) {
 };
 
 App.projectOntoPath = function(shelter, path) {
-  var loc = new google.maps.LatLng(shelter.lat, shelter.lon);
+  var loc = L.latLng(shelter.lat, shelter.lon);
   var bestIdx = 0, bestDist = Infinity;
   for (var i = 0; i < path.length; i++) {
-    var d = google.maps.geometry.spherical.computeDistanceBetween(loc, path[i]);
+    var d = loc.distanceTo(path[i]);
     if (d < bestDist) { bestDist = d; bestIdx = i; }
   }
   return bestIdx;
@@ -310,7 +320,7 @@ App.analyseRouteCoverage = function(path, shelters, radius) {
   runs.forEach(function(run) {
     var d = 0;
     for (var j = 1; j < run.points.length; j++)
-      d += google.maps.geometry.spherical.computeDistanceBetween(run.points[j-1], run.points[j]);
+      d += run.points[j-1].distanceTo(run.points[j]);
 
     if (run.covered) {
       coveredDist += d;
@@ -331,65 +341,92 @@ App.analyseRouteCoverage = function(path, shelters, radius) {
 App.isPointCovered = function(point, shelters, radius) {
   var effectiveRadius = radius / App.WALK_FACTOR;
   for (var i = 0; i < shelters.length; i++) {
-    if (google.maps.geometry.spherical.computeDistanceBetween(point, shelters[i].location) <= effectiveRadius)
+    if (point.distanceTo(shelters[i].location) <= effectiveRadius)
       return true;
   }
   return false;
 };
 
 App.setupDraggableRoute = function(route, shelters, radius) {
-  if (App.draggableRenderer) {
-    App.draggableRenderer.setMap(null);
-    App.draggableRenderer = null;
+  // Remove old interactive elements
+  if (App._interactivePolyline) {
+    if (App.map.hasLayer(App._interactivePolyline)) App.map.removeLayer(App._interactivePolyline);
+    App._interactivePolyline = null;
   }
+  if (App._routeWaypoints) {
+    App._routeWaypoints.forEach(function(wp) { if (App.map.hasLayer(wp)) App.map.removeLayer(wp); });
+  }
+  App._routeWaypoints = [];
+  App._dragRouteData = {
+    origin: route.startLocation,
+    destination: route.endLocation,
+    shelters: shelters,
+    radius: radius,
+  };
 
-  App.draggableRenderer = new google.maps.DirectionsRenderer({
-    map: App.map,
-    directions: route.result,
-    draggable: true,
-    suppressMarkers: true,
-    preserveViewport: true,
-    polylineOptions: {
-      strokeOpacity: 0,
-      strokeWeight: 12,
-      zIndex: 10,
-    },
-  });
-  App.mapObjects.push(App.draggableRenderer);
+  // Add a wider transparent polyline for click-to-add-waypoint interaction
+  App._interactivePolyline = L.polyline(route.path, {
+    color: '#1A4DE8',
+    weight: 20,
+    opacity: 0.0001,
+    interactive: true,
+  }).addTo(App.map);
+  App.mapObjects.push(App._interactivePolyline);
 
-  google.maps.event.addListener(App.draggableRenderer, 'directions_changed', function() {
-    var newDirections = App.draggableRenderer.getDirections();
-    if (!newDirections || !newDirections.routes || !newDirections.routes[0]) return;
+  App._interactivePolyline.on('click', function(e) {
+    L.DomEvent.stopPropagation(e);
+    var icon = L.divIcon({
+      className: 'route-waypoint-icon',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+      html: '<div style="width:16px;height:16px;border-radius:50%;background:#1A4DE8;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);cursor:grab"></div>',
+    });
+    var wp = L.marker(e.latlng, {
+      draggable: true,
+      icon: icon,
+      zIndexOffset: 1000,
+    }).addTo(App.map);
 
-    var allPoints = [];
-    newDirections.routes[0].legs.forEach(function(leg) {
-      leg.steps.forEach(function(step) {
-        var pts = google.maps.geometry.encoding.decodePath(step.polyline.points);
-        allPoints = allPoints.concat(pts);
-      });
+    App._routeWaypoints.push(wp);
+
+    wp.on('dragend', function() {
+      App._rerouteFromWaypoints();
     });
 
-    var totalDistance = newDirections.routes[0].legs.reduce(function(s, l) { return s + l.distance.value; }, 0);
-    var totalDuration = newDirections.routes[0].legs.reduce(function(s, l) { return s + l.duration.value; }, 0);
+    wp.on('contextmenu', function() {
+      App.map.removeLayer(wp);
+      App._routeWaypoints = App._routeWaypoints.filter(function(w) { return w !== wp; });
+      App._rerouteFromWaypoints();
+    });
 
-    var draggedRoute = {
-      result: newDirections,
-      path: allPoints,
-      totalDistance: totalDistance,
-      totalDuration: totalDuration,
-      startLocation: newDirections.routes[0].legs[0].start_location,
-      endLocation: newDirections.routes[0].legs[newDirections.routes[0].legs.length - 1].end_location,
-    };
-
-    App.reanalyseDraggedRoute(draggedRoute, shelters, radius);
+    App._rerouteFromWaypoints();
   });
 };
 
+App._rerouteFromWaypoints = async function() {
+  var data = App._dragRouteData;
+  if (!data) return;
+
+  // Order waypoints along the current path by their position
+  var waypoints = App._routeWaypoints.map(function(wp) { return wp.getLatLng(); });
+
+  var route = await App.getRoute(data.origin, data.destination, waypoints);
+  if (!route) return;
+
+  // Update interactive polyline path
+  if (App._interactivePolyline) {
+    App._interactivePolyline.setLatLngs(route.path);
+  }
+
+  App.reanalyseDraggedRoute(route, data.shelters, data.radius);
+};
+
 App.reanalyseDraggedRoute = function(draggedRoute, shelters, radius) {
+  // Remove old route polylines only
   var toKeep = [];
   App.mapObjects.forEach(function(obj) {
-    if (obj instanceof google.maps.Polyline && obj !== App.draggableRenderer) {
-      obj.setMap(null);
+    if (obj._isRoutePolyline) {
+      if (App.map.hasLayer(obj)) App.map.removeLayer(obj);
     } else {
       toKeep.push(obj);
     }

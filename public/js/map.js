@@ -1,87 +1,119 @@
 window.App = window.App || {};
 
-App.loadMaps = function(key) {
-  var old = document.getElementById('_gms');
-  if (old) { old.remove(); delete window.google; App.mapsReady = false; }
-  return new Promise(function(res, rej) {
-    window.__mapsLoaded = function() { App.mapsReady = true; res(); };
-    var s = document.createElement('script');
-    s.id = '_gms';
-    var mapsLang = App.currentLang === 'he' ? 'iw' : 'en';
-    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + key + '&libraries=places,geometry&callback=__mapsLoaded&language=' + mapsLang + '&loading=async';
-    s.onerror = function() { rej(new Error('Failed to load Google Maps \u2014 check your API key and that Maps JS API + Directions API are enabled.')); };
-    document.head.appendChild(s);
-  });
-};
-
 App.initMap = function() {
-  App.map = new google.maps.Map(document.getElementById('map'), {
-    center: { lat: 31.75, lng: 34.85 },
+  App.map = L.map('map', {
+    center: [31.75, 34.85],
     zoom: 8,
-    disableDefaultUI: false,
-    mapTypeControl: false,
-    streetViewControl: false,
-    fullscreenControl: false,
-    styles: [
-      { featureType:'all', elementType:'geometry', stylers:[{color:'#f2ede4'}] },
-      { featureType:'water', elementType:'geometry', stylers:[{color:'#c3dff0'}] },
-      { featureType:'road', elementType:'geometry', stylers:[{color:'#ffffff'}] },
-      { featureType:'road.arterial', elementType:'geometry', stylers:[{color:'#e8e0d0'}] },
-      { featureType:'road.highway', elementType:'geometry', stylers:[{color:'#d6ccbc'}] },
-      { featureType:'poi', elementType:'labels', stylers:[{visibility:'off'}] },
-      { featureType:'landscape.man_made', elementType:'geometry', stylers:[{color:'#ece6dc'}] },
-    ],
+    zoomControl: true,
   });
-  App.dirSvc = new google.maps.DirectionsService();
-  App.dirRenderer = new google.maps.DirectionsRenderer({
-    suppressMarkers: true,
-    preserveViewport: true,
-    polylineOptions: { strokeOpacity: 0 },
-  });
-  App.dirRenderer.setMap(App.map);
 
-  App.map.addListener('click', function() {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(App.map);
+
+  App.mapsReady = true;
+
+  App.map.on('click', function() {
     App.closeAllIW();
-    if (App._routeInfoWindow) { App._routeInfoWindow.close(); App._routeInfoWindow = null; }
+    if (App._routeInfoWindow) {
+      App.map.closePopup(App._routeInfoWindow);
+      App._routeInfoWindow = null;
+    }
   });
 
-  // Right-click to add community miklat (always available once map loads)
-  App.map.addListener('rightclick', function(e) {
+  App.map.on('contextmenu', function(e) {
     if (App.handleMapRightClick) App.handleMapRightClick(e);
   });
 
   ['origin','dest','mobileOrigin','mobileDest'].forEach(function(id) {
     var el = document.getElementById(id);
-    if (el) {
-      new google.maps.places.Autocomplete(
-        el,
-        { componentRestrictions: { country: 'il' } }
-      );
+    if (el) App.setupAutocomplete(el);
+  });
+};
+
+App.setupAutocomplete = function(inputEl) {
+  var container = inputEl.parentElement;
+  container.style.position = 'relative';
+
+  var dropdown = document.createElement('div');
+  dropdown.className = 'nominatim-dropdown';
+  container.appendChild(dropdown);
+
+  var debounceTimer = null;
+
+  inputEl.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    inputEl._selectedPlace = null;
+    var q = inputEl.value.trim();
+    if (q.length < 3) { dropdown.style.display = 'none'; return; }
+    debounceTimer = setTimeout(function() {
+      var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=il&limit=5&q=' + encodeURIComponent(q);
+      fetch(url).then(function(r) { return r.json(); }).then(function(results) {
+        dropdown.innerHTML = '';
+        if (!results.length) { dropdown.style.display = 'none'; return; }
+        results.forEach(function(r) {
+          var item = document.createElement('div');
+          item.className = 'nominatim-item';
+          item.textContent = r.display_name;
+          item.addEventListener('click', function() {
+            inputEl.value = r.display_name;
+            inputEl._selectedPlace = {
+              lat: parseFloat(r.lat),
+              lng: parseFloat(r.lon),
+            };
+            dropdown.style.display = 'none';
+            // Sync paired input
+            var pairMap = { origin: 'mobileOrigin', dest: 'mobileDest', mobileOrigin: 'origin', mobileDest: 'dest' };
+            var pairedEl = document.getElementById(pairMap[inputEl.id]);
+            if (pairedEl) {
+              pairedEl.value = r.display_name;
+              pairedEl._selectedPlace = inputEl._selectedPlace;
+            }
+          });
+          dropdown.appendChild(item);
+        });
+        dropdown.style.display = 'block';
+      }).catch(function() {
+        dropdown.style.display = 'none';
+      });
+    }, 400);
+  });
+
+  inputEl.addEventListener('focus', function() {
+    if (dropdown.children.length > 0 && inputEl.value.trim().length >= 3) {
+      dropdown.style.display = 'block';
     }
   });
-  google.maps.event.trigger(App.map, 'resize');
+
+  document.addEventListener('click', function(e) {
+    if (!container.contains(e.target)) dropdown.style.display = 'none';
+  });
+
+  inputEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') dropdown.style.display = 'none';
+  });
 };
 
 App._routeInfoWindow = null;
 
 App._addRouteTooltip = function(polyline, content) {
   var isMobile = App.isMobile();
-  var eventName = isMobile ? 'click' : 'mouseover';
+  var popup = L.popup({ closeButton: false, autoPan: false, className: 'route-tooltip-popup' });
 
-  polyline.addListener(eventName, function(e) {
-    if (App._routeInfoWindow) App._routeInfoWindow.close();
-    App._routeInfoWindow = new google.maps.InfoWindow({
-      content: '<div style="font-family:\'DM Mono\',monospace;font-size:11px;padding:2px 4px;white-space:nowrap">' + content + '</div>',
-      position: e.latLng,
-      disableAutoPan: true,
-    });
-    App._routeInfoWindow.open(App.map);
+  polyline.on(isMobile ? 'click' : 'mouseover', function(e) {
+    if (App._routeInfoWindow) App.map.closePopup(App._routeInfoWindow);
+    popup.setLatLng(e.latlng)
+      .setContent('<div style="font-family:\'DM Mono\',monospace;font-size:11px;padding:2px 4px;white-space:nowrap">' + content + '</div>')
+      .openOn(App.map);
+    App._routeInfoWindow = popup;
   });
 
   if (!isMobile) {
-    polyline.addListener('mouseout', function() {
+    polyline.on('mouseout', function() {
       if (App._routeInfoWindow) {
-        App._routeInfoWindow.close();
+        App.map.closePopup(App._routeInfoWindow);
         App._routeInfoWindow = null;
       }
     });
@@ -90,27 +122,22 @@ App._addRouteTooltip = function(polyline, content) {
 
 App.drawRoute = function(coveredSegs, gapSegs, gaps) {
   coveredSegs.forEach(function(pts) {
-    var pl = new google.maps.Polyline({
-      path: pts, map: App.map,
-      strokeColor: '#0f0f0f',
-      strokeWeight: 5,
-      strokeOpacity: 0.9,
-      zIndex: 4,
-    });
+    var pl = L.polyline(pts, {
+      color: '#0f0f0f',
+      weight: 5,
+      opacity: 0.9,
+    }).addTo(App.map);
+    pl._isRoutePolyline = true;
     App.mapObjects.push(pl);
   });
   gapSegs.forEach(function(pts, i) {
-    var pl = new google.maps.Polyline({
-      path: pts, map: App.map,
-      strokeColor: '#D93B22',
-      strokeWeight: 5,
-      strokeOpacity: 0.95,
-      zIndex: 5,
-      icons: [{
-        icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
-        offset: '0', repeat: '12px',
-      }],
-    });
+    var pl = L.polyline(pts, {
+      color: '#D93B22',
+      weight: 5,
+      opacity: 0.95,
+      dashArray: '8, 12',
+    }).addTo(App.map);
+    pl._isRoutePolyline = true;
     var gap = gaps && gaps[i];
     if (gap) {
       var walkMin = Math.ceil(gap.distMeters / 1.4 / 60);
@@ -121,17 +148,17 @@ App.drawRoute = function(coveredSegs, gapSegs, gaps) {
 };
 
 App.drawShelterCircles = function(shelters, radius) {
-  App.shelterCircles.forEach(function(c) { c.setMap(null); });
+  App.shelterCircles.forEach(function(c) { if (App.map.hasLayer(c)) App.map.removeLayer(c); });
   App.shelterCircles = [];
   var visible = document.getElementById('showRadius').checked;
   shelters.forEach(function(s) {
-    var c = new google.maps.Circle({
-      center: s.location, radius: radius,
-      map: visible ? App.map : null,
+    var c = L.circle(s.location, {
+      radius: radius,
       fillColor: '#18C96A', fillOpacity: 0.10,
-      strokeColor: '#18C96A', strokeOpacity: 0.45,
-      strokeWeight: 1.5, zIndex: 1,
+      color: '#18C96A', opacity: 0.45,
+      weight: 1.5,
     });
+    if (visible) c.addTo(App.map);
     App.shelterCircles.push(c);
   });
 };
@@ -146,19 +173,13 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
     var displayName = esc(s.type || s.name || '');
     var displayAddr = esc(s.addr || '');
     var displayNotes = s.notes ? esc(s.notes) : '';
-    var marker = new google.maps.Marker({
-      position: s.location, map: App.map,
-      title: s.name,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: isWaypoint ? 10 : 7,
-        fillColor: markerColor,
-        fillOpacity: 1,
-        strokeColor: isWaypoint ? '#0f0f0f' : '#fff',
-        strokeWeight: isWaypoint ? 2.5 : 1.5,
-      },
-      zIndex: isWaypoint ? 12 : 8,
-    });
+    var marker = L.circleMarker(s.location, {
+      radius: isWaypoint ? 10 : 7,
+      fillColor: markerColor,
+      fillOpacity: 1,
+      color: isWaypoint ? '#0f0f0f' : '#fff',
+      weight: isWaypoint ? 2.5 : 1.5,
+    }).addTo(App.map);
 
     var accessBadge = s.accessible === '\u05db\u05df'
       ? '<span style="color:#2e7d32;font-size:10px">\u267f \u05e0\u05d2\u05d9\u05e9</span>' : '';
@@ -173,34 +194,32 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
     var communityBadgeHtml = isCommunity
       ? '<div style="margin-bottom:4px"><span style="background:#E88A1A;color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">' + App.t('communityBadge') + '</span></div>' : '';
 
-    var iw = new google.maps.InfoWindow({
-      content: '<div style="font-family:\'DM Mono\',monospace;font-size:12px;padding:2px 4px;max-width:280px">' +
-        communityBadgeHtml +
-        '<b style="font-family:\'Syne\',sans-serif;font-size:13px">' + displayName + '</b>' +
-        (displayAddr ? '<br><span style="color:#888">' + displayAddr + '</span>' : '') +
-        '<br><span style="color:#1A4DE8;font-size:11px">' + (isWaypoint ? App.t('routeWaypoint') : '\u05de\u05e7\u05dc\u05d8 #' + (s.ms_miklat || '')) + '</span>' +
-        areaStr + filtStr +
-        '<br>' + statusBadge + ' ' + accessBadge +
-        notesStr +
-        '<div class="iw-rating-line" data-shelter="' + s.id + '" style="margin-top:6px;font-size:11px"></div>' +
-        '<div class="iw-reviews" data-shelter="' + s.id + '"></div>' +
-        '<div class="review-form" style="margin-top:8px;padding-top:6px;border-top:1px solid #eee">' +
-          '<div style="font-size:10px;color:#888;margin-bottom:2px">' + App.t('rateThisShelter') + '</div>' +
-          '<div class="star-input" data-shelter="' + s.id + '" style="direction:ltr">' +
-            '<span data-v="1">\u2606</span><span data-v="2">\u2606</span><span data-v="3">\u2606</span><span data-v="4">\u2606</span><span data-v="5">\u2606</span>' +
-          '</div>' +
-          '<textarea placeholder="' + App.t('phReview') + '" maxlength="500"></textarea>' +
-          '<button onclick="submitReview(\'' + s.id + '\', this)">' + App.t('submitBtn') + '</button>' +
+    var popupContent = '<div style="font-family:\'DM Mono\',monospace;font-size:12px;padding:2px 4px;max-width:280px">' +
+      communityBadgeHtml +
+      '<b style="font-family:\'Syne\',sans-serif;font-size:13px">' + displayName + '</b>' +
+      (displayAddr ? '<br><span style="color:#888">' + displayAddr + '</span>' : '') +
+      '<br><span style="color:#1A4DE8;font-size:11px">' + (isWaypoint ? App.t('routeWaypoint') : '\u05de\u05e7\u05dc\u05d8 #' + (s.ms_miklat || '')) + '</span>' +
+      areaStr + filtStr +
+      '<br>' + statusBadge + ' ' + accessBadge +
+      notesStr +
+      '<div class="iw-rating-line" data-shelter="' + s.id + '" style="margin-top:6px;font-size:11px"></div>' +
+      '<div class="iw-reviews" data-shelter="' + s.id + '"></div>' +
+      '<div class="review-form" style="margin-top:8px;padding-top:6px;border-top:1px solid #eee">' +
+        '<div style="font-size:10px;color:#888;margin-bottom:2px">' + App.t('rateThisShelter') + '</div>' +
+        '<div class="star-input" data-shelter="' + s.id + '" style="direction:ltr">' +
+          '<span data-v="1">\u2606</span><span data-v="2">\u2606</span><span data-v="3">\u2606</span><span data-v="4">\u2606</span><span data-v="5">\u2606</span>' +
         '</div>' +
-        '<div style="margin-top:4px;color:#aaa;font-size:9px">' + (App.detectedCity ? App.detectedCity.nameHe : '') + '</div>' +
-      '</div>'
-    });
-    marker.addListener('click', function() {
-      App.closeAllIW();
-      iw.open(App.map, marker);
+        '<textarea placeholder="' + App.t('phReview') + '" maxlength="500"></textarea>' +
+        '<button onclick="submitReview(\'' + s.id + '\', this)">' + App.t('submitBtn') + '</button>' +
+      '</div>' +
+      '<div style="margin-top:4px;color:#aaa;font-size:9px">' + (App.detectedCity ? App.detectedCity.nameHe : '') + '</div>' +
+    '</div>';
+
+    marker.bindPopup(popupContent, { maxWidth: 300 });
+    marker.on('click', function() {
       App.highlightCard(i);
     });
-    google.maps.event.addListener(iw, 'domready', function() {
+    marker.on('popupopen', function() {
       var r = App.shelterRatings[s.id];
       var rLine = document.querySelector('.iw-rating-line[data-shelter="' + s.id + '"]');
       if (rLine && r) {
@@ -226,9 +245,7 @@ App.drawShelterMarkers = function(shelters, usedShelters) {
       }
     });
     App.mapObjects.push(marker);
-    App.mapObjects.push(iw);
     s._marker = marker;
-    s._iw = iw;
     s._idx = i;
   });
 };
@@ -238,54 +255,49 @@ App.drawEndpoints = function(route) {
     { pos: route.startLocation, color: '#18C96A', title: 'Start' },
     { pos: route.endLocation,   color: '#D93B22', title: 'End'   },
   ].forEach(function(item) {
-    var m = new google.maps.Marker({
-      position: item.pos, map: App.map, title: item.title,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 11,
-        fillColor: item.color, fillOpacity: 1,
-        strokeColor: '#0f0f0f', strokeWeight: 2.5,
-      },
-      zIndex: 20,
-    });
+    var m = L.circleMarker(item.pos, {
+      radius: 11,
+      fillColor: item.color, fillOpacity: 1,
+      color: '#0f0f0f', weight: 2.5,
+    }).addTo(App.map);
     App.mapObjects.push(m);
   });
 };
 
 App.fitAll = function(route, shelters) {
-  var bounds = new google.maps.LatLngBounds();
-  route.path.forEach(function(p) { bounds.extend(p); });
+  var bounds = L.latLngBounds(route.path);
   shelters.forEach(function(s) { bounds.extend(s.location); });
   var bottomPad = App.isMobile() ? App.SHEET_PEEK + 20 : 50;
   var topPad = App.isMobile() ? 130 : 50;
-  App.map.fitBounds(bounds, { top: topPad, right: 50, bottom: bottomPad, left: 50 });
+  App.map.fitBounds(bounds, { paddingTopLeft: [50, topPad], paddingBottomRight: [50, bottomPad] });
 };
 
 App.closeAllIW = function() {
-  App.mapObjects.forEach(function(o) { if (o instanceof google.maps.InfoWindow) o.close(); });
+  App.map.closePopup();
 };
 
 App.clearAll = function() {
   App.mapObjects.forEach(function(o) {
-    if (o.setMap) o.setMap(null);
-    else if (o.close) o.close();
+    if (App.map.hasLayer(o)) App.map.removeLayer(o);
   });
   App.mapObjects = [];
-  App.shelterCircles.forEach(function(c) { c.setMap(null); });
+  App.shelterCircles.forEach(function(c) { if (App.map.hasLayer(c)) App.map.removeLayer(c); });
   App.shelterCircles = [];
   App.shelterRatings = {};
   if (App.communityMarkers) {
-    App.communityMarkers.forEach(function(o) { if (o.setMap) o.setMap(null); else if (o.close) o.close(); });
+    App.communityMarkers.forEach(function(o) { if (App.map.hasLayer(o)) App.map.removeLayer(o); });
     App.communityMarkers = [];
   }
-  if (App.dirRenderer) App.dirRenderer.setDirections({ routes: [] });
-  if (App.draggableRenderer) {
-    App.draggableRenderer.setMap(null);
-    App.draggableRenderer = null;
+  if (App._routeWaypoints) {
+    App._routeWaypoints.forEach(function(wp) { if (App.map.hasLayer(wp)) App.map.removeLayer(wp); });
+    App._routeWaypoints = [];
   }
-
+  if (App._interactivePolyline) {
+    if (App.map.hasLayer(App._interactivePolyline)) App.map.removeLayer(App._interactivePolyline);
+    App._interactivePolyline = null;
+  }
   if (App._routeInfoWindow) {
-    App._routeInfoWindow.close();
+    App.map.closePopup(App._routeInfoWindow);
     App._routeInfoWindow = null;
   }
 

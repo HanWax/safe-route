@@ -2,8 +2,6 @@ window.App = window.App || {};
 
 // Shared state
 App.map = null;
-App.dirSvc = null;
-App.dirRenderer = null;
 App.mapsReady = false;
 App.mapObjects = [];
 App.shelterCircles = [];
@@ -26,6 +24,20 @@ window.cancelAddMiklat = function() { App.cancelAddMiklat(); };
 window.saveCommunityMiklat = function() { App.saveCommunityMiklat(); };
 window.shareToGoogleMaps = function() { App.shareToGoogleMaps(); };
 window.shareRoute = function(e) { App.shareRoute(e); };
+
+// Geocode an address string to coordinates using Nominatim
+App.geocode = function(address) {
+  var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=il&limit=1&q=' + encodeURIComponent(address);
+  return fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      if (results && results.length) {
+        return L.latLng(parseFloat(results[0].lat), parseFloat(results[0].lon));
+      }
+      return null;
+    })
+    .catch(function() { return null; });
+};
 
 App.useMyLocation = function(fieldId) {
   if (!navigator.geolocation) {
@@ -131,6 +143,15 @@ App.swapLocations = function() {
   App.geoLocations.origin = App.geoLocations.dest;
   App.geoLocations.dest = tmpGeo;
 
+  // Swap selected places from autocomplete
+  var tmpPlace = originEl._selectedPlace;
+  originEl._selectedPlace = destEl._selectedPlace;
+  destEl._selectedPlace = tmpPlace;
+  if (mOriginEl && mDestEl) {
+    mOriginEl._selectedPlace = originEl._selectedPlace;
+    mDestEl._selectedPlace = destEl._selectedPlace;
+  }
+
   var originBtn = originEl.parentElement.querySelector('.loc-btn');
   var destBtn = destEl.parentElement.querySelector('.loc-btn');
   if (originBtn && destBtn) {
@@ -176,22 +197,41 @@ App.run = async function() {
 
   App.setBusy(true);
   try {
+    // Initialize map if not ready
     if (!App.mapsReady) {
-      App.setStatus(App.t('statusLoadingConfig'), 'info');
-      var res = await fetch('/api/config');
-      if (!res.ok) throw new Error(App.t('statusConfigErr'));
-      var configData = await res.json();
-      App.setStatus(App.t('statusLoadingMaps'), 'info');
-      await App.loadMaps(configData.key);
       App.initMap();
     }
 
-    var orig = App.geoLocations.origin
-      ? new google.maps.LatLng(App.geoLocations.origin.lat, App.geoLocations.origin.lng)
-      : origText;
-    var dest = App.geoLocations.dest
-      ? new google.maps.LatLng(App.geoLocations.dest.lat, App.geoLocations.dest.lng)
-      : destText;
+    // Resolve origin coordinates
+    var orig;
+    var originEl = document.getElementById('origin');
+    if (App.geoLocations.origin) {
+      orig = L.latLng(App.geoLocations.origin.lat, App.geoLocations.origin.lng);
+    } else if (originEl._selectedPlace) {
+      orig = L.latLng(originEl._selectedPlace.lat, originEl._selectedPlace.lng);
+    } else {
+      App.setStatus(App.t('statusGettingRoute'), 'info');
+      orig = await App.geocode(origText);
+      if (!orig) {
+        App.setStatus('Could not find location: ' + origText, 'err');
+        return;
+      }
+    }
+
+    // Resolve destination coordinates
+    var dest;
+    var destEl = document.getElementById('dest');
+    if (App.geoLocations.dest) {
+      dest = L.latLng(App.geoLocations.dest.lat, App.geoLocations.dest.lng);
+    } else if (destEl._selectedPlace) {
+      dest = L.latLng(destEl._selectedPlace.lat, destEl._selectedPlace.lng);
+    } else {
+      dest = await App.geocode(destText);
+      if (!dest) {
+        App.setStatus('Could not find location: ' + destText, 'err');
+        return;
+      }
+    }
 
     App.clearAll();
     App.setStatus(App.t('statusGettingRoute'), 'info');
@@ -288,11 +328,14 @@ App.loadExample = function(id) {
   document.getElementById('dest').value = destVal;
   App.geoLocations.origin = null;
   App.geoLocations.dest = null;
+  // Clear any cached autocomplete selections
+  document.getElementById('origin')._selectedPlace = null;
+  document.getElementById('dest')._selectedPlace = null;
 
   var mo = document.getElementById('mobileOrigin');
   var md = document.getElementById('mobileDest');
-  if (mo) mo.value = originVal;
-  if (md) md.value = destVal;
+  if (mo) { mo.value = originVal; mo._selectedPlace = null; }
+  if (md) { md.value = destVal; md._selectedPlace = null; }
 
   App.run();
 };
@@ -329,8 +372,8 @@ App.buildGoogleMapsUrl = function() {
   var share = App.lastRouteShare;
   if (!share) return null;
 
-  var origin = share.startLocation.lat() + ',' + share.startLocation.lng();
-  var dest = share.endLocation.lat() + ',' + share.endLocation.lng();
+  var origin = share.startLocation.lat + ',' + share.startLocation.lng;
+  var dest = share.endLocation.lat + ',' + share.endLocation.lng;
 
   var url = 'https://www.google.com/maps/dir/?api=1'
     + '&origin=' + origin
@@ -361,13 +404,11 @@ App.shareRoute = function(e) {
   var title = App.t('shareTitle')(share.coveragePct);
   var text = App.t('shareText');
 
-  // Try native share first (mobile)
   if (navigator.share) {
     navigator.share({ title: title, text: text, url: url }).catch(function() {});
     return;
   }
 
-  // Fallback: copy to clipboard
   var clickedBtn = e && e.target ? e.target.closest('.share-btn') : null;
   if (!navigator.clipboard) { window.open(url, '_blank', 'noopener'); return; }
   navigator.clipboard.writeText(url).then(function() {
@@ -406,7 +447,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Shelter radius toggle sync
   function toggleShelterCircles(visible) {
-    App.shelterCircles.forEach(function(c) { c.setMap(visible ? App.map : null); });
+    App.shelterCircles.forEach(function(c) {
+      if (visible) {
+        if (!App.map.hasLayer(c)) c.addTo(App.map);
+      } else {
+        if (App.map.hasLayer(c)) App.map.removeLayer(c);
+      }
+    });
   }
   var srToggle = document.getElementById('showRadius');
   var mSrToggle = document.getElementById('mobileShowRadius');
@@ -461,15 +508,5 @@ window.addEventListener('resize', function() {
 // Init language from saved preference
 App.setLang(localStorage.getItem('miklat-lang') || 'en');
 
-// Load map eagerly so user sees Israel immediately
-(async function preloadMap() {
-  try {
-    var res = await fetch('/api/config');
-    if (!res.ok) return;
-    var data = await res.json();
-    await App.loadMaps(data.key);
-    App.initMap();
-  } catch (e) {
-    // Map will load on first route request instead
-  }
-})();
+// Initialize map immediately (Leaflet loads synchronously from CDN)
+App.initMap();

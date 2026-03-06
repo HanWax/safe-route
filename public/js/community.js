@@ -12,29 +12,14 @@ App.communityPlacementLatLng = null;
 App.communityMarkers = [];
 App._communityAutocomplete = null;
 
-// Ensure map is loaded before community actions
-App._ensureMap = async function() {
-  if (App.mapsReady) return true;
-  try {
-    var res = await fetch('/api/config');
-    if (!res.ok) return false;
-    var data = await res.json();
-    await App.loadMaps(data.key);
-    App.initMap();
-    return true;
-  } catch (e) {
-    App.setStatus(App.t('statusConfigErr'), 'err');
-    return false;
-  }
-};
-
-// Button click: show form immediately with address autocomplete (no map pin)
 App.startAddMiklat = async function() {
-  if (!(await App._ensureMap())) return;
+  if (!App.mapsReady) {
+    App.initMap();
+  }
 
   App.communityPlacementLatLng = null;
   if (App.communityPlacementMarker) {
-    App.communityPlacementMarker.setMap(null);
+    App.map.removeLayer(App.communityPlacementMarker);
     App.communityPlacementMarker = null;
   }
 
@@ -42,38 +27,45 @@ App.startAddMiklat = async function() {
 };
 
 // Right-click on map: place pin, reverse geocode, show form with address pre-filled
-// Called from map.js rightclick listener
 App.handleMapRightClick = function(e) {
-  App.communityPlacementLatLng = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-  App._placeOrMoveMarker(e.latLng);
+  App.communityPlacementLatLng = { lat: e.latlng.lat, lng: e.latlng.lng };
+  App._placeOrMoveMarker(e.latlng);
   App._showCommunityForm(false);
-  App._reverseGeocode(e.latLng);
+  App._reverseGeocode(e.latlng);
 };
 
 App._placeOrMoveMarker = function(latLng) {
   if (App.communityPlacementMarker) {
-    App.communityPlacementMarker.setPosition(latLng);
-    App.communityPlacementMarker.setMap(App.map);
+    App.communityPlacementMarker.setLatLng(latLng);
+    if (!App.map.hasLayer(App.communityPlacementMarker)) {
+      App.communityPlacementMarker.addTo(App.map);
+    }
   } else {
-    App.communityPlacementMarker = new google.maps.Marker({
-      position: latLng,
-      map: App.map,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 12,
-        fillColor: '#E88A1A',
-        fillOpacity: 1,
-        strokeColor: '#0f0f0f',
-        strokeWeight: 2,
-      },
-      zIndex: 30,
+    App.communityPlacementMarker = L.circleMarker(latLng, {
+      radius: 12,
+      fillColor: '#E88A1A',
+      fillOpacity: 1,
+      color: '#0f0f0f',
+      weight: 2,
+    }).addTo(App.map);
+    // Make it draggable via a regular marker on top
+    var dragMarker = L.marker(latLng, {
       draggable: true,
-    });
-    google.maps.event.addListener(App.communityPlacementMarker, 'dragend', function() {
-      var pos = App.communityPlacementMarker.getPosition();
-      App.communityPlacementLatLng = { lat: pos.lat(), lng: pos.lng() };
+      icon: L.divIcon({
+        className: 'community-drag-marker',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        html: '<div style="width:28px;height:28px;border-radius:50%;background:#E88A1A;border:2px solid #0f0f0f;opacity:0.7;cursor:grab"></div>',
+      }),
+      zIndexOffset: 2000,
+    }).addTo(App.map);
+    dragMarker.on('dragend', function() {
+      var pos = dragMarker.getLatLng();
+      App.communityPlacementLatLng = { lat: pos.lat, lng: pos.lng };
+      App.communityPlacementMarker.setLatLng(pos);
       App._reverseGeocode(pos);
     });
+    App.communityPlacementMarker._dragMarker = dragMarker;
   }
 };
 
@@ -90,23 +82,35 @@ App._showCommunityForm = function(isButtonMode) {
     addrInput.focus();
   }
 
-  // Attach Places Autocomplete to address field (once)
-  if (!App._communityAutocomplete && window.google && google.maps.places) {
-    App._communityAutocomplete = new google.maps.places.Autocomplete(
-      addrInput,
-      { componentRestrictions: { country: 'il' } }
-    );
-    App._communityAutocomplete.addListener('place_changed', function() {
-      var place = App._communityAutocomplete.getPlace();
-      if (place && place.geometry && place.geometry.location) {
-        var loc = place.geometry.location;
-        App.communityPlacementLatLng = { lat: loc.lat(), lng: loc.lng() };
-        App._placeOrMoveMarker(loc);
-        App.map.panTo(loc);
+  // Attach Nominatim autocomplete to address field (once)
+  if (!App._communityAutocomplete) {
+    App._communityAutocomplete = true;
+    App.setupAutocomplete(addrInput);
+    // Listen for place selection
+    addrInput.addEventListener('input', function() {
+      // When a place is selected via autocomplete dropdown,
+      // _selectedPlace will be set by setupAutocomplete
+    });
+    // Check periodically for selected place (set by autocomplete click handler)
+    var checkPlace = function() {
+      if (addrInput._selectedPlace) {
+        var loc = addrInput._selectedPlace;
+        App.communityPlacementLatLng = { lat: loc.lat, lng: loc.lng };
+        var ll = L.latLng(loc.lat, loc.lng);
+        App._placeOrMoveMarker(ll);
+        App.map.panTo(ll);
         App.map.setZoom(17);
         document.getElementById('communityAddrStatus').textContent = '';
       }
-    });
+    };
+    addrInput.addEventListener('click', function() { setTimeout(checkPlace, 100); });
+    // Also use MutationObserver alternative: just check on dropdown item click
+    var origSetup = addrInput.parentElement.querySelector('.nominatim-dropdown');
+    if (origSetup) {
+      origSetup.addEventListener('click', function() {
+        setTimeout(checkPlace, 50);
+      });
+    }
   }
 };
 
@@ -116,27 +120,35 @@ App._reverseGeocode = function(latLng) {
   statusEl.textContent = App.t('communityReverseGeocoding');
   statusEl.className = 'community-form-addr-status';
 
-  var geocoder = new google.maps.Geocoder();
-  geocoder.geocode({ location: latLng }, function(results, status) {
-    if (status === 'OK' && results[0]) {
-      addrInput.value = results[0].formatted_address;
+  var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + latLng.lat + '&lon=' + latLng.lng;
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data && data.display_name) {
+        addrInput.value = data.display_name;
+        statusEl.textContent = '';
+      } else {
+        statusEl.textContent = '';
+      }
+      addrInput.focus();
+    })
+    .catch(function() {
       statusEl.textContent = '';
-    } else {
-      statusEl.textContent = '';
-    }
-    addrInput.focus();
-  });
+      addrInput.focus();
+    });
 };
 
 App.cancelAddMiklat = function() {
   App.communityPlacementMode = false;
   document.getElementById('communityFormOverlay').classList.remove('show');
   if (App.communityPlacementMarker) {
-    App.communityPlacementMarker.setMap(null);
+    if (App.communityPlacementMarker._dragMarker) {
+      App.map.removeLayer(App.communityPlacementMarker._dragMarker);
+    }
+    App.map.removeLayer(App.communityPlacementMarker);
     App.communityPlacementMarker = null;
   }
   App.communityPlacementLatLng = null;
-  if (App.map) App.map.setOptions({ draggableCursor: null });
 };
 
 App.saveCommunityMiklat = async function() {
@@ -173,8 +185,9 @@ App.saveCommunityMiklat = async function() {
         return;
       }
       App.communityPlacementLatLng = coords;
-      App._placeOrMoveMarker(new google.maps.LatLng(coords.lat, coords.lng));
-      App.map.panTo(new google.maps.LatLng(coords.lat, coords.lng));
+      var ll = L.latLng(coords.lat, coords.lng);
+      App._placeOrMoveMarker(ll);
+      App.map.panTo(ll);
     } catch (e) {
       statusEl.textContent = App.t('communityGeocodeFailed');
       statusEl.className = 'community-form-addr-status err';
@@ -219,64 +232,44 @@ App.saveCommunityMiklat = async function() {
 };
 
 App._geocodeAddress = function(address) {
-  return new Promise(function(resolve) {
-    var geocoder = new google.maps.Geocoder();
-    geocoder.geocode(
-      { address: address, componentRestrictions: { country: 'IL' } },
-      function(results, status) {
-        if (status === 'OK' && results[0] && results[0].geometry) {
-          var loc = results[0].geometry.location;
-          resolve({ lat: loc.lat(), lng: loc.lng() });
-        } else {
-          resolve(null);
-        }
+  var url = 'https://nominatim.openstreetmap.org/search?format=json&countrycodes=il&limit=1&q=' + encodeURIComponent(address);
+  return fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      if (results && results.length) {
+        return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
       }
-    );
-  });
+      return null;
+    })
+    .catch(function() { return null; });
 };
 
 App.addCommunityMarkerToMap = function(s) {
   if (!App.map) return;
   var safeName = App.escapeHtml(s.name);
   var safeDesc = s.description ? App.escapeHtml(s.description) : '';
-  var pos = new google.maps.LatLng(s.lat, s.lng);
-  var marker = new google.maps.Marker({
-    position: pos,
-    map: App.map,
-    title: s.name,
-    icon: {
-      path: google.maps.SymbolPath.CIRCLE,
-      scale: 9,
-      fillColor: '#E88A1A',
-      fillOpacity: 1,
-      strokeColor: '#0f0f0f',
-      strokeWeight: 1.5,
-    },
-    zIndex: 9,
-  });
+  var pos = L.latLng(s.lat, s.lng);
+  var marker = L.circleMarker(pos, {
+    radius: 9,
+    fillColor: '#E88A1A',
+    fillOpacity: 1,
+    color: '#0f0f0f',
+    weight: 1.5,
+  }).addTo(App.map);
 
-  var iw = new google.maps.InfoWindow({
-    content: '<div style="font-family:\'DM Mono\',monospace;font-size:12px;padding:2px 4px;max-width:260px">' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
-        '<span style="background:#E88A1A;color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">' + App.t('communityBadge') + '</span>' +
-      '</div>' +
-      '<b style="font-family:\'Syne\',sans-serif;font-size:13px">' + safeName + '</b>' +
-      (safeDesc ? '<div style="color:#666;font-size:11px;margin-top:4px;line-height:1.4">' + safeDesc + '</div>' : '') +
-      '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #eee;font-size:9px;color:#aaa">' + App.t('communityDisclaimer') + '</div>' +
-    '</div>'
-  });
+  var popupContent = '<div style="font-family:\'DM Mono\',monospace;font-size:12px;padding:2px 4px;max-width:260px">' +
+    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
+      '<span style="background:#E88A1A;color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">' + App.t('communityBadge') + '</span>' +
+    '</div>' +
+    '<b style="font-family:\'Syne\',sans-serif;font-size:13px">' + safeName + '</b>' +
+    (safeDesc ? '<div style="color:#666;font-size:11px;margin-top:4px;line-height:1.4">' + safeDesc + '</div>' : '') +
+    '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #eee;font-size:9px;color:#aaa">' + App.t('communityDisclaimer') + '</div>' +
+  '</div>';
 
-  marker.addListener('click', function() {
-    App.closeAllIW();
-    iw.open(App.map, marker);
-  });
+  marker.bindPopup(popupContent, { maxWidth: 280 });
 
   App.communityMarkers.push(marker);
-  App.communityMarkers.push(iw);
-
-  // Also add to mapObjects for cleanup and InfoWindow close on map click
   App.mapObjects.push(marker);
-  App.mapObjects.push(iw);
 };
 
 App.fetchCommunityShelters = async function(bbox) {
@@ -306,7 +299,7 @@ App.fetchCommunityShelters = async function(bbox) {
         notes: '',
         status: '',
         accessible: '',
-        location: null, // will be set after google maps is loaded
+        location: null, // will be set after adding L.latLng
       };
     });
   } catch (e) {

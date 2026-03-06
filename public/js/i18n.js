@@ -46,8 +46,8 @@ App.STRINGS = {
     includeCommunity: 'Include community miklatim',
     statusEnterBoth: 'Enter both a start and end point.',
     statusLoadingConfig: 'Loading configuration\u2026',
-    statusConfigErr: 'Could not load API config. Is GOOGLE_MAPS_API_KEY set in Vercel?',
-    statusLoadingMaps: 'Loading Google Maps\u2026',
+    statusConfigErr: 'Could not load map configuration.',
+    statusLoadingMaps: 'Loading map\u2026',
     statusGettingRoute: 'Getting walking route\u2026',
     statusFetchingShelters: function(city) { return 'Fetching \u05de\u05e7\u05dc\u05d8\u05d9\u05dd from ' + city + '\u2026'; },
     statusFoundShelters: function(n) { return 'Found ' + n + ' miklatim. Optimising route\u2026'; },
@@ -143,8 +143,8 @@ App.STRINGS = {
     includeCommunity: '\u05db\u05dc\u05d5\u05dc \u05de\u05e7\u05dc\u05d8\u05d9\u05dd \u05e7\u05d4\u05d9\u05dc\u05ea\u05d9\u05d9\u05dd',
     statusEnterBoth: '\u05d4\u05d6\u05d9\u05e0\u05d5 \u05e0\u05e7\u05d5\u05d3\u05ea \u05d4\u05ea\u05d7\u05dc\u05d4 \u05d5\u05d9\u05e2\u05d3.',
     statusLoadingConfig: '\u05d8\u05d5\u05e2\u05df \u05d4\u05d2\u05d3\u05e8\u05d5\u05ea\u2026',
-    statusConfigErr: '\u05dc\u05d0 \u05e0\u05d9\u05ea\u05df \u05dc\u05d8\u05e2\u05d5\u05df \u05d4\u05d2\u05d3\u05e8\u05d5\u05ea API. \u05d4\u05d0\u05dd GOOGLE_MAPS_API_KEY \u05de\u05d5\u05d2\u05d3\u05e8?',
-    statusLoadingMaps: '\u05d8\u05d5\u05e2\u05df \u05de\u05e4\u05d5\u05ea \u05d2\u05d5\u05d2\u05dc\u2026',
+    statusConfigErr: '\u05dc\u05d0 \u05e0\u05d9\u05ea\u05df \u05dc\u05d8\u05e2\u05d5\u05df \u05d4\u05d2\u05d3\u05e8\u05d5\u05ea \u05d4\u05de\u05e4\u05d4.',
+    statusLoadingMaps: '\u05d8\u05d5\u05e2\u05df \u05de\u05e4\u05d4\u2026',
     statusGettingRoute: '\u05de\u05d7\u05e9\u05d1 \u05de\u05e1\u05dc\u05d5\u05dc \u05d4\u05dc\u05d9\u05db\u05d4\u2026',
     statusFetchingShelters: function(city) { return '\u05de\u05d0\u05ea\u05e8 \u05de\u05e7\u05dc\u05d8\u05d9\u05dd \u05de' + city + '\u2026'; },
     statusFoundShelters: function(n) { return '\u05e0\u05de\u05e6\u05d0\u05d5 ' + n + ' \u05de\u05e7\u05dc\u05d8\u05d9\u05dd. \u05de\u05d9\u05d9\u05e2\u05dc \u05de\u05e1\u05dc\u05d5\u05dc\u2026'; },
@@ -223,5 +223,4 @@ App.setLang = function(lang) {
     if (typeof val === 'string') el.title = val;
   });
   localStorage.setItem('miklat-lang', lang);
-  App.mapsReady = false;
 };

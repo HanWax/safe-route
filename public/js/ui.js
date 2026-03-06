@@ -109,29 +109,14 @@ App.renderShelterList = async function(shelters, path, radius) {
   var countEl = document.getElementById('shelterCount');
   if (countEl) countEl.textContent = '(' + nearby.length + ')';
 
-  var walkData = [];
-  if (nearby.length) {
-    var origins = nearby.map(function(s) { return s.nearestRoutePoint; });
-    var dests = nearby.map(function(s) { return s.location; });
-    try {
-      walkData = await App.getWalkingDistances(origins, dests);
-    } catch (e) {
-      console.warn('Distance Matrix failed, using estimates', e);
-    }
-  }
-
+  // Use straight-line distance estimates instead of Google Distance Matrix
   nearby.forEach(function(s, i) {
     var card = document.createElement('div');
     card.className = 's-card';
     card.id = 'scard-' + s._idx;
 
-    var wd = walkData[i];
-    var walkMin = wd
-      ? Math.ceil(wd.duration.value / 60)
-      : Math.ceil((s.routeDist * App.WALK_FACTOR) / 80);
-    var distLabel = wd
-      ? wd.distance.text
-      : '~' + Math.round(s.routeDist * App.WALK_FACTOR) + 'm';
+    var walkMin = Math.ceil((s.routeDist * App.WALK_FACTOR) / 80);
+    var distLabel = '~' + Math.round(s.routeDist * App.WALK_FACTOR) + 'm';
 
     var esc = App.escapeHtml;
     var tagsHtml = '';
@@ -167,7 +152,7 @@ App.renderShelterList = async function(shelters, path, radius) {
     card.addEventListener('click', function() {
       App.map.panTo(s.location); App.map.setZoom(17);
       App.closeAllIW();
-      if (s._iw) s._iw.open(App.map, s._marker);
+      if (s._marker) s._marker.openPopup();
       App.highlightCard(s._idx);
     });
     list.appendChild(card);
@@ -244,52 +229,17 @@ App.submitReview = async function(shelterId, btn) {
 App.closestOnPath = function(point, path) {
   var min = Infinity, closest = path[0], closestIdx = 0;
   for (var i = 0; i < path.length; i++) {
-    var d = google.maps.geometry.spherical.computeDistanceBetween(point, path[i]);
+    var d = point.distanceTo(path[i]);
     if (d < min) { min = d; closest = path[i]; closestIdx = i; }
   }
   return { dist: min, point: closest, pathIndex: closestIdx };
-};
-
-App.getWalkingDistances = async function(origins, destinations) {
-  var service = new google.maps.DistanceMatrixService();
-  var walkingData = new Array(origins.length).fill(null);
-  var batchSize = 10;
-
-  for (var i = 0; i < origins.length; i += batchSize) {
-    var end = Math.min(i + batchSize, origins.length);
-    var batchOrigins = origins.slice(i, end);
-    var batchDests = destinations.slice(i, end);
-
-    var result = await new Promise(function(resolve) {
-      service.getDistanceMatrix({
-        origins: batchOrigins,
-        destinations: batchDests,
-        travelMode: google.maps.TravelMode.WALKING,
-      }, function(response, status) {
-        resolve(status === 'OK' ? response : null);
-      });
-    });
-
-    if (result) {
-      for (var j = 0; j < result.rows.length; j++) {
-        var element = result.rows[j].elements[j];
-        if (element && element.status === 'OK') {
-          walkingData[i + j] = {
-            distance: element.distance,
-            duration: element.duration,
-          };
-        }
-      }
-    }
-  }
-  return walkingData;
 };
 
 App.getPathBbox = function(path, bufDeg) {
   bufDeg = bufDeg || 0.005;
   var s = Infinity, n = -Infinity, w = Infinity, e = -Infinity;
   for (var i = 0; i < path.length; i++) {
-    var lat = path[i].lat(), lng = path[i].lng();
+    var lat = path[i].lat, lng = path[i].lng;
     if (lat < s) s = lat; if (lat > n) n = lat;
     if (lng < w) w = lng; if (lng > e) e = lng;
   }
@@ -299,7 +249,7 @@ App.getPathBbox = function(path, bufDeg) {
 App.minDistToPath = function(point, path) {
   var min = Infinity;
   for (var i = 0; i < path.length; i++) {
-    var d = google.maps.geometry.spherical.computeDistanceBetween(point, path[i]);
+    var d = point.distanceTo(path[i]);
     if (d < min) min = d;
   }
   return min;

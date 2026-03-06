@@ -634,6 +634,40 @@ body.he .example-chip { text-align: right; }
 .map-wrap { flex: 1; position: relative; min-width: 0; min-height: 0; }
 #map { width: 100%; height: 100%; display: block; }
 
+/* -- NOMINATIM AUTOCOMPLETE -- */
+.nominatim-dropdown {
+  position: absolute; top: 100%; left: 0; right: 0;
+  z-index: 1000; background: var(--white);
+  border: 1px solid var(--border); border-top: none;
+  max-height: 200px; overflow-y: auto;
+  display: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+.nominatim-item {
+  padding: 8px 12px; cursor: pointer;
+  font-size: 11px; font-family: 'DM Mono', monospace;
+  border-bottom: 1px solid var(--paper2);
+  color: var(--ink); line-height: 1.4;
+}
+.nominatim-item:hover { background: var(--paper); }
+.nominatim-item:last-child { border-bottom: none; }
+
+/* -- LEAFLET POPUP OVERRIDES -- */
+.leaflet-popup-content-wrapper {
+  border-radius: var(--radius-sm) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+.leaflet-popup-content { margin: 8px 10px !important; }
+.route-tooltip-popup .leaflet-popup-content-wrapper {
+  padding: 0; border-radius: 4px !important;
+}
+.route-tooltip-popup .leaflet-popup-tip { display: none; }
+
+/* Hide Leaflet attribution details on small screens */
+@media (max-width: 768px) {
+  .leaflet-control-attribution { font-size: 8px; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
+
 /* -- DATA SOURCE -- */
 .data-src {
   font-size: 9px; color: var(--muted); margin-top: 8px;

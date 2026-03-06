@@ -14,29 +14,30 @@ function assertDeepEqual(actual, expected, msg) {
   else { failed++; console.error('  FAIL: ' + msg + '\n    expected: ' + b + '\n    actual:   ' + a); }
 }
 
-// --- Mock Google Maps geometry ---
-var google = { maps: { geometry: { spherical: {
-  computeDistanceBetween: function(a, b) {
-    // Simple Euclidean approx (fine for test purposes with small coords)
-    var dlat = (a.lat() - b.lat()) * 111320;
-    var dlng = (a.lng() - b.lng()) * 111320 * Math.cos(a.lat() * Math.PI / 180);
-    return Math.sqrt(dlat * dlat + dlng * dlng);
-  }
-}}, LatLng: function(lat, lng) {
-  this._lat = lat; this._lng = lng;
-  this.lat = function() { return this._lat; };
-  this.lng = function() { return this._lng; };
-}}};
+// --- Mock Leaflet L.latLng ---
+function LatLng(lat, lng) {
+  this.lat = lat;
+  this.lng = lng;
+}
+LatLng.prototype.distanceTo = function(other) {
+  // Simple Euclidean approx (fine for test purposes with small coords)
+  var dlat = (this.lat - other.lat) * 111320;
+  var dlng = (this.lng - other.lng) * 111320 * Math.cos(this.lat * Math.PI / 180);
+  return Math.sqrt(dlat * dlat + dlng * dlng);
+};
+
+var L = {
+  latLng: function(lat, lng) { return new LatLng(lat, lng); }
+};
 
 // --- Load the functions under test ---
 var App = {};
-// Inline the two functions we need to test (they only depend on google.maps)
 
 App.projectOntoPath = function(shelter, path) {
-  var loc = new google.maps.LatLng(shelter.lat, shelter.lon);
+  var loc = L.latLng(shelter.lat, shelter.lon);
   var bestIdx = 0, bestDist = Infinity;
   for (var i = 0; i < path.length; i++) {
-    var d = google.maps.geometry.spherical.computeDistanceBetween(loc, path[i]);
+    var d = loc.distanceTo(path[i]);
     if (d < bestDist) { bestDist = d; bestIdx = i; }
   }
   return bestIdx;
@@ -55,14 +56,12 @@ App.orderWaypointsAlongPath = function(shelters, path) {
 console.log('\n--- orderWaypointsAlongPath ---');
 
 (function testBasicOrdering() {
-  // Path goes south to north: (32.06,34.77) -> (32.07,34.77) -> (32.08,34.77)
   var path = [
-    new google.maps.LatLng(32.06, 34.77),
-    new google.maps.LatLng(32.07, 34.77),
-    new google.maps.LatLng(32.08, 34.77),
+    L.latLng(32.06, 34.77),
+    L.latLng(32.07, 34.77),
+    L.latLng(32.08, 34.77),
   ];
 
-  // Shelters given in reverse order (C near end, B near middle, A near start)
   var shelters = [
     { id: 'C', lat: 32.079, lon: 34.771 },
     { id: 'A', lat: 32.061, lon: 34.771 },
@@ -76,14 +75,13 @@ console.log('\n--- orderWaypointsAlongPath ---');
     'shelters reordered from start to end of path'
   );
 
-  // Original array should not be mutated
   assert(shelters[0].id === 'C', 'original array not mutated');
 })();
 
 (function testSingleShelter() {
   var path = [
-    new google.maps.LatLng(32.06, 34.77),
-    new google.maps.LatLng(32.08, 34.77),
+    L.latLng(32.06, 34.77),
+    L.latLng(32.08, 34.77),
   ];
   var shelters = [{ id: 'X', lat: 32.07, lon: 34.77 }];
   var ordered = App.orderWaypointsAlongPath(shelters, path);
@@ -91,16 +89,15 @@ console.log('\n--- orderWaypointsAlongPath ---');
 })();
 
 (function testEmpty() {
-  var path = [new google.maps.LatLng(32.06, 34.77)];
+  var path = [L.latLng(32.06, 34.77)];
   var ordered = App.orderWaypointsAlongPath([], path);
   assert(ordered.length === 0, 'empty input returns empty output');
 })();
 
 (function testSheltersAtSamePathPoint() {
-  // Two shelters both closest to the same path point - should not crash
   var path = [
-    new google.maps.LatLng(32.06, 34.77),
-    new google.maps.LatLng(32.08, 34.77),
+    L.latLng(32.06, 34.77),
+    L.latLng(32.08, 34.77),
   ];
   var shelters = [
     { id: 'A', lat: 32.061, lon: 34.770 },
@@ -111,31 +108,28 @@ console.log('\n--- orderWaypointsAlongPath ---');
 })();
 
 (function testRealisticTelAvivRoute() {
-  // Simulate a route from Nahmani (south) to Gan Meir (north) along King George St
   var path = [
-    new google.maps.LatLng(32.0630, 34.7720), // Nahmani
-    new google.maps.LatLng(32.0645, 34.7715),
-    new google.maps.LatLng(32.0660, 34.7710),
-    new google.maps.LatLng(32.0675, 34.7705),
-    new google.maps.LatLng(32.0690, 34.7700),
-    new google.maps.LatLng(32.0705, 34.7695),
-    new google.maps.LatLng(32.0720, 34.7690), // Gan Meir area
+    L.latLng(32.0630, 34.7720),
+    L.latLng(32.0645, 34.7715),
+    L.latLng(32.0660, 34.7710),
+    L.latLng(32.0675, 34.7705),
+    L.latLng(32.0690, 34.7700),
+    L.latLng(32.0705, 34.7695),
+    L.latLng(32.0720, 34.7690),
   ];
 
-  // Shelters sorted by coverage count (how the bug ordered them)
   var shelters = [
-    { id: 'mid1',   lat: 32.0665, lon: 34.7712 },  // near middle
-    { id: 'end1',   lat: 32.0710, lon: 34.7693 },  // near end
-    { id: 'start1', lat: 32.0635, lon: 34.7718 },  // near start
-    { id: 'mid2',   lat: 32.0680, lon: 34.7703 },  // near middle
-    { id: 'end2',   lat: 32.0725, lon: 34.7688 },  // near end
-    { id: 'start2', lat: 32.0648, lon: 34.7716 },  // near start
+    { id: 'mid1',   lat: 32.0665, lon: 34.7712 },
+    { id: 'end1',   lat: 32.0710, lon: 34.7693 },
+    { id: 'start1', lat: 32.0635, lon: 34.7718 },
+    { id: 'mid2',   lat: 32.0680, lon: 34.7703 },
+    { id: 'end2',   lat: 32.0725, lon: 34.7688 },
+    { id: 'start2', lat: 32.0648, lon: 34.7716 },
   ];
 
   var ordered = App.orderWaypointsAlongPath(shelters, path);
   var ids = ordered.map(function(s) { return s.id; });
 
-  // Verify start shelters come first, then mid, then end
   var startIdx1 = ids.indexOf('start1');
   var startIdx2 = ids.indexOf('start2');
   var midIdx1 = ids.indexOf('mid1');
@@ -153,9 +147,9 @@ console.log('\n--- projectOntoPath ---');
 
 (function testProjectOntoPath() {
   var path = [
-    new google.maps.LatLng(32.06, 34.77),  // idx 0
-    new google.maps.LatLng(32.07, 34.77),  // idx 1
-    new google.maps.LatLng(32.08, 34.77),  // idx 2
+    L.latLng(32.06, 34.77),
+    L.latLng(32.07, 34.77),
+    L.latLng(32.08, 34.77),
   ];
 
   assert(App.projectOntoPath({ lat: 32.061, lon: 34.77 }, path) === 0, 'projects to index 0 (near start)');
