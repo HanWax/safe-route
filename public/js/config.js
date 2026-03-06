@@ -411,6 +411,26 @@ App.CITY_CONFIGS = [
     },
   },
   {
+    id: 'givat-shmuel',
+    name: 'Givat Shmuel',
+    nameHe: 'גבעת שמואל',
+    center: { lat: 32.08, lng: 34.85 },
+    staticUrl: '/api/givat-shmuel-shelters',
+    outFields: ['*'],
+    parseFeat: function(feat) {
+      var a = feat.attributes, g = feat.geometry;
+      var lat = g.y, lon = g.x;
+      if (!lat || !lon) return null;
+      return {
+        id: 'gs-' + a.OBJECTID, lat: lat, lon: lon,
+        name: a.name || 'מקלט ציבורי', type: '',
+        addr: a.address || '', addrEng: '',
+        area: a.area || 0, filtration: '', notes: '',
+        status: '', accessible: '',
+      };
+    },
+  },
+  {
     id: 'kiryat-malakhi',
     name: 'Kiryat Malakhi',
     nameHe: '\u05e7\u05e8\u05d9\u05ea \u05de\u05dc\u05d0\u05db\u05d9',
