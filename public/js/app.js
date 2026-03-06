@@ -20,7 +20,6 @@ window.submitReview = function(id, btn) { App.submitReview(id, btn); };
 window.startAddMiklat = function() { App.startAddMiklat(); };
 window.cancelAddMiklat = function() { App.cancelAddMiklat(); };
 window.saveCommunityMiklat = function() { App.saveCommunityMiklat(); };
-window.shareToGoogleMaps = function() { App.shareToGoogleMaps(); };
 window.shareRoute = function(e) { App.shareRoute(e); };
 
 App.useMyLocation = function(fieldId) {
