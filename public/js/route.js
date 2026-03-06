@@ -33,8 +33,19 @@ App._extractLatLng = function(loc) {
 
 App._parseValhallaTrip = function(trip) {
   var allPoints = [];
+  var maneuvers = [];
   trip.legs.forEach(function(leg) {
     allPoints = allPoints.concat(App._decodeValhalla(leg.shape));
+    if (leg.maneuvers) {
+      leg.maneuvers.forEach(function(m) {
+        maneuvers.push({
+          instruction: m.instruction || '',
+          length: m.length,
+          time: m.time,
+          type: m.type,
+        });
+      });
+    }
   });
   return {
     path: allPoints,
@@ -42,6 +53,7 @@ App._parseValhallaTrip = function(trip) {
     totalDuration: Math.round(trip.summary.time),
     startLocation: allPoints[0],
     endLocation: allPoints[allPoints.length - 1],
+    maneuvers: maneuvers,
   };
 };
 

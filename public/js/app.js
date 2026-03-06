@@ -21,6 +21,7 @@ window.startAddMiklat = function() { App.startAddMiklat(); };
 window.cancelAddMiklat = function() { App.cancelAddMiklat(); };
 window.saveCommunityMiklat = function() { App.saveCommunityMiklat(); };
 window.shareRoute = function(e) { App.shareRoute(e); };
+window.exportPDF = function() { App.exportPDF(); };
 
 App.useMyLocation = function(fieldId) {
   if (!navigator.geolocation) {
@@ -244,6 +245,9 @@ App.run = async function() {
       waypoints: buildResult.usedShelters,
       coveragePct: analysis.coveredPct,
       radius: radius,
+      maneuvers: finalRoute.maneuvers || [],
+      totalDistance: finalRoute.totalDistance,
+      totalDuration: finalRoute.totalDuration,
     };
 
     App.renderScore(analysis.coveredPct, analysis.gaps, finalRoute, shelters.length);
@@ -358,13 +362,13 @@ App.shareRoute = function(e) {
   var title = App.t('shareTitle')(share.coveragePct);
   var text = App.t('shareText');
 
-  // Try native share first (mobile)
-  if (navigator.share) {
+  // Native share on mobile only
+  if (App.isMobile() && navigator.share) {
     navigator.share({ title: title, text: text, url: url }).catch(function() {});
     return;
   }
 
-  // Fallback: copy to clipboard
+  // Copy to clipboard on desktop
   var clickedBtn = e && e.target ? e.target.closest('.share-btn') : null;
   if (!navigator.clipboard) { window.open(url, '_blank', 'noopener'); return; }
   navigator.clipboard.writeText(url).then(function() {
@@ -376,6 +380,41 @@ App.shareRoute = function(e) {
   }).catch(function() {
     window.open(url, '_blank', 'noopener');
   });
+};
+
+// PDF export
+
+App.exportPDF = async function() {
+  var share = App.lastRouteShare;
+  if (!share) return;
+
+  var btn = document.querySelector('.share-btn--pdf');
+  var btnSpan = btn ? btn.querySelector('span') : null;
+  if (btnSpan) btnSpan.textContent = App.t('exportingPDF');
+
+  try {
+    var params = new URLSearchParams({
+      olat: share.startLocation.lat.toFixed(6),
+      olng: share.startLocation.lng.toFixed(6),
+      dlat: share.endLocation.lat.toFixed(6),
+      dlng: share.endLocation.lng.toFixed(6),
+      r: share.radius,
+    });
+    var resp = await fetch('/api/pdf?' + params.toString());
+    if (!resp.ok) throw new Error('PDF generation failed (' + resp.status + ')');
+    var blob = await resp.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'miklat-route.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('PDF export failed:', err);
+    App.setStatus(App.t('exportPDFFailed') || 'PDF export failed', 'err');
+  } finally {
+    if (btnSpan) btnSpan.textContent = App.t('exportPDF');
+  }
 };
 
 // Event listeners

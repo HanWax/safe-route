@@ -1,5 +1,7 @@
 {
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.4"
+    "@neondatabase/serverless": "^0.10.4",
+    "@sparticuz/chromium": "^143.0.4",
+    "playwright-core": "^1.58.2"
   }
 }
