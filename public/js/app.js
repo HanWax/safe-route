@@ -251,8 +251,13 @@ App.run = async function() {
     }
     directRoute._alternatives = altRoutes;
 
-    var bbox = App.getPathBbox(directRoute.path, 0.012);
-    var cities = App.detectCities(directRoute.path);
+    // Combine all route paths so bbox and shelter fetch cover all alternatives
+    var allPaths = directRoute.path;
+    if (altRoutes.length) {
+      altRoutes.forEach(function(alt) { allPaths = allPaths.concat(alt.path); });
+    }
+    var bbox = App.getPathBbox(allPaths, 0.012);
+    var cities = App.detectCities(allPaths);
     var cityNames = cities.map(function(c) { return App.currentLang === 'he' ? c.nameHe : c.name; });
     App.setStatus(App.t('statusFetchingShelters')(cityNames.join(', ')), 'info');
     var shelters = await App.fetchShelters(bbox, directRoute.path);

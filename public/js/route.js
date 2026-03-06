@@ -48,7 +48,7 @@ App.getRoute = function(origin, destination, waypoints, options) {
         return null;
       }
 
-      if (options && options.alternatives && data.routes.length > 1) {
+      if (options && options.alternatives) {
         return data.routes.map(App._parseOsrmRoute);
       }
 
