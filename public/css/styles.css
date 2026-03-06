@@ -1230,3 +1230,43 @@ input:focus:not(:focus-visible),
 select:focus:not(:focus-visible) {
   outline: none;
 }
+
+/* -- Draggable route waypoints -- */
+.drag-waypoint { cursor: grab; }
+.drag-waypoint:active { cursor: grabbing; }
+
+/* -- Photon Autocomplete Dropdown -- */
+.photon-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  display: none;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.photon-item {
+  padding: 8px 12px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--paper2);
+  transition: background 0.1s;
+}
+.photon-item:last-child { border-bottom: none; }
+.photon-item:hover { background: var(--blue-dim); }
+
+/* -- Leaflet popup overrides -- */
+.leaflet-popup-content-wrapper {
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  font-family: 'DM Mono', monospace;
+}
+.leaflet-popup-content { margin: 8px 12px; }
+.leaflet-popup-tip { box-shadow: var(--shadow-sm); }

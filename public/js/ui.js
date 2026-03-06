@@ -165,9 +165,9 @@ App.renderShelterList = async function(shelters, path, radius) {
 
     card.style.animationDelay = Math.min(i * 50, 400) + 'ms';
     card.addEventListener('click', function() {
-      App.map.panTo(s.location); App.map.setZoom(17);
+      App.map.setView(s.location, 17);
       App.closeAllIW();
-      if (s._iw) s._iw.open(App.map, s._marker);
+      if (s._marker) s._marker.openPopup();
       App.highlightCard(s._idx);
     });
     list.appendChild(card);
@@ -244,7 +244,7 @@ App.submitReview = async function(shelterId, btn) {
 App.closestOnPath = function(point, path) {
   var min = Infinity, closest = path[0], closestIdx = 0;
   for (var i = 0; i < path.length; i++) {
-    var d = google.maps.geometry.spherical.computeDistanceBetween(point, path[i]);
+    var d = point.distanceTo(path[i]);
     if (d < min) { min = d; closest = path[i]; closestIdx = i; }
   }
   return { dist: min, point: closest, pathIndex: closestIdx };
@@ -259,8 +259,8 @@ App.getWalkingDistances = async function(origins, destinations) {
     var batchOrigins = origins.slice(i, end);
     var batchDests = destinations.slice(i, end);
 
-    var sources = batchOrigins.map(function(o) { return { lat: o.lat(), lon: o.lng() }; });
-    var targets = batchDests.map(function(d) { return { lat: d.lat(), lon: d.lng() }; });
+    var sources = batchOrigins.map(function(o) { return { lat: o.lat, lon: o.lng }; });
+    var targets = batchDests.map(function(d) { return { lat: d.lat, lon: d.lng }; });
 
     var body = JSON.stringify({
       sources: sources,
@@ -298,7 +298,7 @@ App.getPathBbox = function(path, bufDeg) {
   bufDeg = bufDeg || 0.005;
   var s = Infinity, n = -Infinity, w = Infinity, e = -Infinity;
   for (var i = 0; i < path.length; i++) {
-    var lat = path[i].lat(), lng = path[i].lng();
+    var lat = path[i].lat, lng = path[i].lng;
     if (lat < s) s = lat; if (lat > n) n = lat;
     if (lng < w) w = lng; if (lng > e) e = lng;
   }
@@ -308,7 +308,7 @@ App.getPathBbox = function(path, bufDeg) {
 App.minDistToPath = function(point, path) {
   var min = Infinity;
   for (var i = 0; i < path.length; i++) {
-    var d = google.maps.geometry.spherical.computeDistanceBetween(point, path[i]);
+    var d = point.distanceTo(path[i]);
     if (d < min) min = d;
   }
   return min;

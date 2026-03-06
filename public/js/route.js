@@ -1,8 +1,10 @@
 window.App = window.App || {};
 
 App.nominatimGeocode = function(query) {
+  var q = query;
+  if (!/israel/i.test(q)) q += ', Israel';
   return fetch('https://nominatim.openstreetmap.org/search?' + new URLSearchParams({
-    q: query, format: 'json', limit: 1, countrycodes: 'il',
+    q: q, format: 'json', limit: 1, countrycodes: 'il',
   }))
   .then(function(r) { return r.json(); })
   .then(function(results) {
@@ -12,24 +14,6 @@ App.nominatimGeocode = function(query) {
 };
 
 App.geocode = function(query) {
-  // Use Google Geocoder (already loaded for map) with Nominatim fallback
-  if (typeof google !== 'undefined' && google.maps && google.maps.Geocoder) {
-    if (!App._geocoder) App._geocoder = new google.maps.Geocoder();
-    return new Promise(function(resolve) {
-      App._geocoder.geocode(
-        { address: query, region: 'il' },
-        function(results, status) {
-          if (status === 'OK' && results.length) {
-            var loc = results[0].geometry.location;
-            resolve({ lat: loc.lat(), lng: loc.lng() });
-          } else {
-            // Fall back to Nominatim
-            App.nominatimGeocode(query).then(resolve);
-          }
-        }
-      );
-    });
-  }
   return App.nominatimGeocode(query);
 };
 
@@ -44,10 +28,7 @@ App.nominatimReverse = function(lat, lng) {
 };
 
 App._extractLatLng = function(loc) {
-  return {
-    lat: typeof loc.lat === 'function' ? loc.lat() : loc.lat,
-    lng: typeof loc.lng === 'function' ? loc.lng() : loc.lng,
-  };
+  return { lat: loc.lat, lng: loc.lng };
 };
 
 App._parseValhallaTrip = function(trip) {
@@ -145,7 +126,7 @@ App._fetchCityShelters = async function(city, bbox) {
     if (!parsed) return;
     shelters.push(Object.assign({}, parsed, {
       source: city.id,
-      location: new google.maps.LatLng(parsed.lat, parsed.lon),
+      location: L.latLng(parsed.lat, parsed.lon),
     }));
   });
 
@@ -177,7 +158,7 @@ App.fetchShelters = async function(bbox, routePath) {
     try {
       var commShelters = await App.fetchCommunityShelters(bbox);
       commShelters.forEach(function(cs) {
-        cs.location = new google.maps.LatLng(cs.lat, cs.lng);
+        cs.location = L.latLng(cs.lat, cs.lng);
         shelters.push(cs);
       });
     } catch (e) {
@@ -189,7 +170,7 @@ App.fetchShelters = async function(bbox, routePath) {
 };
 
 App._decodeValhalla = function(encoded) {
-  // Valhalla uses precision 6 (Google uses 5)
+  // Valhalla uses precision 6
   var inv = 1e-6;
   var decoded = [];
   var lat = 0, lng = 0;
@@ -201,16 +182,63 @@ App._decodeValhalla = function(encoded) {
     shift = 0; result = 0;
     do { b = encoded.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
     lng += (result & 1) ? ~(result >> 1) : (result >> 1);
-    decoded.push(new google.maps.LatLng(lat * inv, lng * inv));
+    decoded.push(L.latLng(lat * inv, lng * inv));
   }
   return decoded;
 };
 
-App._pickBestCorridor = function(directPath, altPaths, shelters, radius) {
+App._routeBBox = function(origin, destination, padding) {
+  var lats = [origin.lat, destination.lat];
+  var lngs = [origin.lng, destination.lng];
+  var latSpan = Math.abs(lats[0] - lats[1]);
+  var lngSpan = Math.abs(lngs[0] - lngs[1]);
+  var pad = padding || 0.3;
+  var latPad = Math.max(latSpan * pad, 0.002);
+  var lngPad = Math.max(lngSpan * pad, 0.002);
+  return {
+    south: Math.min(lats[0], lats[1]) - latPad,
+    north: Math.max(lats[0], lats[1]) + latPad,
+    west: Math.min(lngs[0], lngs[1]) - lngPad,
+    east: Math.max(lngs[0], lngs[1]) + lngPad,
+  };
+};
+
+App._pointInBBox = function(p, bbox) {
+  return p.lat >= bbox.south && p.lat <= bbox.north && p.lng >= bbox.west && p.lng <= bbox.east;
+};
+
+App._pathExceedsBBox = function(path, bbox) {
+  var outCount = 0;
+  for (var i = 0; i < path.length; i++) {
+    if (!App._pointInBBox(path[i], bbox)) outCount++;
+  }
+  return outCount / path.length > 0.05;
+};
+
+// Project each route point onto the O→D axis. Returns true if any point
+// extends beyond origin (t < -tolerance) or beyond destination (t > 1+tolerance).
+// This catches routes that overshoot past endpoints and loop back.
+App._routeOvershoots = function(path, origin, destination, tolerance) {
+  tolerance = tolerance || 0.1;
+  var dx = destination.lng - origin.lng;
+  var dy = destination.lat - origin.lat;
+  var lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return false;
+  for (var i = 0; i < path.length; i++) {
+    var px = path[i].lng - origin.lng;
+    var py = path[i].lat - origin.lat;
+    var t = (px * dx + py * dy) / lenSq;
+    if (t < -tolerance || t > 1 + tolerance) return true;
+  }
+  return false;
+};
+
+App._pickBestCorridor = function(directPath, altPaths, shelters, radius, orig, dest) {
   var bestPath = directPath;
   var bestCoverage = App.analyseRouteCoverage(directPath, shelters, radius);
 
   altPaths.forEach(function(altPath) {
+    if (orig && dest && App._routeOvershoots(altPath, orig, dest)) return;
     var coverage = App.analyseRouteCoverage(altPath, shelters, radius);
     if (coverage.coveredPct > bestCoverage.coveredPct ||
         (coverage.coveredPct === bestCoverage.coveredPct && (coverage.gapDist || 0) < (bestCoverage.gapDist || 0))) {
@@ -223,7 +251,6 @@ App._pickBestCorridor = function(directPath, altPaths, shelters, radius) {
 };
 
 App._extractCorridorWaypoints = function(corridorPath, numWaypoints) {
-  // Sample evenly-spaced points along the corridor to use as route waypoints
   if (corridorPath.length < 3) return [];
   var step = Math.floor(corridorPath.length / (numWaypoints + 1));
   var waypoints = [];
@@ -238,30 +265,32 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   var coverageTarget = 100;
   if (!shelters.length) return { waypointRoute: null, usedShelters: [], achievedPct: 0 };
 
+  var bbox = App._routeBBox(orig, dest);
+
   var directCoverage = App.analyseRouteCoverage(directRoute.path, shelters, radius);
 
-  // Explore alternative corridors from the initial Valhalla response
   var altPaths = (directRoute.alternatives || []).map(function(alt) { return alt.path; });
-  var corridor = App._pickBestCorridor(directRoute.path, altPaths, shelters, radius);
+  var corridor = App._pickBestCorridor(directRoute.path, altPaths, shelters, radius, orig, dest);
 
-  // If an alternative corridor is better, re-route through it with waypoints
   if (corridor.path !== directRoute.path && corridor.coverage.coveredPct > directCoverage.coveredPct) {
-    var corridorWps = App._extractCorridorWaypoints(corridor.path, 5);
-    try {
-      var corridorRoute = await App.getRoute(orig, dest, corridorWps);
-      if (corridorRoute) {
-        var corridorCov = App.analyseRouteCoverage(corridorRoute.path, shelters, radius);
-        if (corridorCov.coveredPct >= coverageTarget) {
-          return { waypointRoute: corridorRoute, usedShelters: [], achievedPct: corridorCov.coveredPct };
+    var corridorWps = App._extractCorridorWaypoints(corridor.path, 5)
+      .filter(function(wp) { return App._pointInBBox(wp, bbox); });
+    if (corridorWps.length) {
+      try {
+        var corridorRoute = await App.getRoute(orig, dest, corridorWps);
+        if (corridorRoute && !App._routeOvershoots(corridorRoute.path, orig, dest)) {
+          var corridorCov = App.analyseRouteCoverage(corridorRoute.path, shelters, radius);
+          if (corridorCov.coveredPct >= coverageTarget) {
+            return { waypointRoute: corridorRoute, usedShelters: [], achievedPct: corridorCov.coveredPct };
+          }
+          if (corridorCov.coveredPct > directCoverage.coveredPct) {
+            directRoute = corridorRoute;
+            directCoverage = corridorCov;
+          }
         }
-        // Use the better corridor as the new base for gap-patching
-        if (corridorCov.coveredPct > directCoverage.coveredPct) {
-          directRoute = corridorRoute;
-          directCoverage = corridorCov;
-        }
+      } catch (e) {
+        console.warn('Corridor re-route failed, using direct route', e);
       }
-    } catch (e) {
-      console.warn('Corridor re-route failed, using direct route', e);
     }
   }
   if (directCoverage.coveredPct >= coverageTarget) {
@@ -286,7 +315,6 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   var selectedShelters = [];
   var MAX_WAYPOINTS = 23;
   var MAX_ITERATIONS = 3;
-  // Reject detours that add more exposed distance than they save
   var MAX_DETOUR_RATIO = 1.5;
   var directDist = directRoute.totalDistance;
 
@@ -298,11 +326,11 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
     if (selectedShelters.length >= MAX_WAYPOINTS) break;
 
     var candidates = shelters
-      .filter(function(s) { return !usedIds.has(s.id); })
+      .filter(function(s) { return !usedIds.has(s.id) && App._pointInBBox(s.location, bbox); })
       .map(function(s) {
         var coverCount = 0;
         for (var j = 0; j < currentGapPoints.length; j++) {
-          if (google.maps.geometry.spherical.computeDistanceBetween(currentGapPoints[j], s.location) <= effectiveRadius * 2) {
+          if (currentGapPoints[j].distanceTo(s.location) <= effectiveRadius * 2) {
             coverCount++;
           }
         }
@@ -330,12 +358,10 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
 
     try {
       var orderedShelters = App.orderWaypointsAlongPath(selectedShelters, directRoute.path);
-      var waypoints = orderedShelters.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
+      var waypoints = orderedShelters.map(function(s) { return L.latLng(s.lat, s.lon); });
       var wpRoute = await App.getRoute(orig, dest, waypoints);
       if (wpRoute) {
-        // Reject routes that are too long compared to the direct path
-        if (wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {
-          // Revert to previous best and stop adding waypoints
+        if (wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO || App._routeOvershoots(wpRoute.path, orig, dest)) {
           selectedShelters.length = 0;
           bestShelters.forEach(function(s) { selectedShelters.push(s); });
           usedIds.clear();
@@ -344,7 +370,6 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
         }
         var coverage = App.analyseRouteCoverage(wpRoute.path, shelters, radius);
         var newGapDist = coverage.gapDist || 0;
-        // Accept route only if it reduces total exposed (uncovered) meters
         if (newGapDist < bestGapDist) {
           bestRoute = wpRoute;
           bestGapDist = newGapDist;
@@ -372,13 +397,14 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
     return { waypointRoute: bestRoute, usedShelters: bestShelters, achievedPct: bestPct };
   }
 
-  // Fallback: single-pass nearest-shelter approach (only close shelters)
+  // Fallback: single-pass nearest-shelter approach
   var waypointShelterSet = new Set();
   var waypointShelters = [];
   for (var gi = 0; gi < gapPoints.length; gi++) {
     var nearest = null, nearestD = Infinity;
     for (var si = 0; si < shelters.length; si++) {
-      var d = google.maps.geometry.spherical.computeDistanceBetween(gapPoints[gi], shelters[si].location);
+      if (!App._pointInBBox(shelters[si].location, bbox)) continue;
+      var d = gapPoints[gi].distanceTo(shelters[si].location);
       if (d < nearestD) { nearestD = d; nearest = shelters[si]; }
     }
     if (nearest && !waypointShelterSet.has(nearest.id) && nearestD < (radius * 2) / App.WALK_FACTOR) {
@@ -392,14 +418,13 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
 
   try {
     var orderedFallback = App.orderWaypointsAlongPath(waypointShelters, directRoute.path);
-    var waypoints = orderedFallback.map(function(s) { return new google.maps.LatLng(s.lat, s.lon); });
+    var waypoints = orderedFallback.map(function(s) { return L.latLng(s.lat, s.lon); });
     var wpRoute = await App.getRoute(orig, dest, waypoints);
-    if (wpRoute && wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {
+    if (wpRoute && (wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO || App._routeOvershoots(wpRoute.path, orig, dest))) {
       return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
     }
     var fallbackCoverage = wpRoute ? App.analyseRouteCoverage(wpRoute.path, shelters, radius) : null;
     var fallbackGapDist = fallbackCoverage ? (fallbackCoverage.gapDist || 0) : Infinity;
-    // Only use fallback route if it actually reduces exposed distance
     if (fallbackGapDist < directGapDist) {
       return { waypointRoute: wpRoute, usedShelters: waypointShelters, achievedPct: fallbackCoverage.coveredPct };
     }
@@ -417,10 +442,10 @@ App.orderWaypointsAlongPath = function(shelters, path) {
 };
 
 App.projectOntoPath = function(shelter, path) {
-  var loc = new google.maps.LatLng(shelter.lat, shelter.lon);
+  var loc = L.latLng(shelter.lat, shelter.lon);
   var bestIdx = 0, bestDist = Infinity;
   for (var i = 0; i < path.length; i++) {
-    var d = google.maps.geometry.spherical.computeDistanceBetween(loc, path[i]);
+    var d = loc.distanceTo(path[i]);
     if (d < bestDist) { bestDist = d; bestIdx = i; }
   }
   return bestIdx;
@@ -449,7 +474,7 @@ App.analyseRouteCoverage = function(path, shelters, radius) {
   runs.forEach(function(run) {
     var d = 0;
     for (var j = 1; j < run.points.length; j++)
-      d += google.maps.geometry.spherical.computeDistanceBetween(run.points[j-1], run.points[j]);
+      d += run.points[j-1].distanceTo(run.points[j]);
 
     if (run.covered) {
       coveredDist += d;
@@ -468,63 +493,140 @@ App.analyseRouteCoverage = function(path, shelters, radius) {
 };
 
 App.setupDraggableRoute = function(orig, dest, finalRoute, shelters, radius) {
-  // Clean up previous drag state
-  if (App._dragOverlay) { App._dragOverlay.setMap(null); App._dragOverlay = null; }
-  if (App._dragMarkers) { App._dragMarkers.forEach(function(m) { m.setMap(null); }); }
+  App._dragCleanup();
   App._dragMarkers = [];
   App._dragOrig = orig;
   App._dragDest = dest;
   App._dragShelters = shelters;
   App._dragRadius = radius;
+  App._dragPath = finalRoute.path;
 
-  // Invisible thick polyline for click detection
-  App._dragOverlay = new google.maps.Polyline({
-    path: finalRoute.path,
-    map: App.map,
-    strokeOpacity: 0,
-    strokeWeight: 20,
-    zIndex: 15,
-    clickable: true,
-  });
-  App.mapObjects.push(App._dragOverlay);
+  var mapContainer = App.map.getContainer();
 
-  App._dragOverlay.addListener('click', function(e) {
-    App._addDragWaypoint(e.latLng);
-  });
+  // Track mouse proximity to route for cursor hint
+  App._dragMouseMove = function(e) {
+    if (!App._dragPath || App._dragging) return;
+    var px = App.map.mouseEventToContainerPoint(e);
+    var near = App._nearRoute(px, 20);
+    mapContainer.style.cursor = near ? 'pointer' : '';
+  };
+
+  // Mousedown near route: create marker, start dragging immediately
+  App._dragMouseDown = function(e) {
+    if (!App._dragPath || e.button !== 0) return;
+    var px = App.map.mouseEventToContainerPoint(e);
+    if (!App._nearRoute(px, 20)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    var latlng = App.map.mouseEventToLatLng(e);
+    App.map.dragging.disable();
+    App._dragging = true;
+
+    // Create the waypoint marker
+    var marker = L.marker(latlng, {
+      icon: L.divIcon({
+        className: 'drag-waypoint',
+        html: '<div style="width:14px;height:14px;border-radius:50%;background:#0f0f0f;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      }),
+      zIndexOffset: 500,
+      interactive: false,
+    }).addTo(App.map);
+    App._dragMarkers.push(marker);
+    App.mapObjects.push(marker);
+
+    // Follow mouse while dragging
+    function onMove(ev) {
+      var ll = App.map.mouseEventToLatLng(ev);
+      marker.setLatLng(ll);
+    }
+
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      App.map.dragging.enable();
+      App._dragging = false;
+      mapContainer.style.cursor = '';
+
+      // Replace with a proper draggable marker at the final position
+      var finalLatLng = marker.getLatLng();
+      marker.remove();
+      var idx = App._dragMarkers.indexOf(marker);
+
+      var newMarker = L.marker(finalLatLng, {
+        draggable: true,
+        icon: L.divIcon({
+          className: 'drag-waypoint',
+          html: '<div style="width:14px;height:14px;border-radius:50%;background:#0f0f0f;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        }),
+        zIndexOffset: 500,
+      }).addTo(App.map);
+
+      if (idx !== -1) App._dragMarkers[idx] = newMarker;
+      App.mapObjects.push(newMarker);
+
+      newMarker.on('dragend', function() {
+        App._rerouteFromDragMarkers();
+      });
+      newMarker.on('contextmenu', function() {
+        newMarker.remove();
+        App._dragMarkers = App._dragMarkers.filter(function(m) { return m !== newMarker; });
+        App._rerouteFromDragMarkers();
+      });
+
+      App._rerouteFromDragMarkers();
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  mapContainer.addEventListener('mousemove', App._dragMouseMove);
+  mapContainer.addEventListener('mousedown', App._dragMouseDown);
 };
 
-App._addDragWaypoint = function(latLng) {
-  var marker = new google.maps.Marker({
-    position: latLng,
-    map: App.map,
-    draggable: true,
-    icon: {
-      path: google.maps.SymbolPath.CIRCLE,
-      scale: 8,
-      fillColor: '#1A4DE8',
-      fillOpacity: 0.9,
-      strokeColor: '#fff',
-      strokeWeight: 2,
-    },
-    zIndex: 25,
-    title: 'Drag to adjust route',
-  });
+App._dragCleanup = function() {
+  if (App._dragMouseMove || App._dragMouseDown) {
+    var c = App.map.getContainer();
+    c.removeEventListener('mousemove', App._dragMouseMove);
+    c.removeEventListener('mousedown', App._dragMouseDown);
+    c.style.cursor = '';
+    App._dragMouseMove = null;
+    App._dragMouseDown = null;
+  }
+  if (App._dragMarkers) {
+    App._dragMarkers.forEach(function(m) { m.remove(); });
+  }
+  App._dragMarkers = [];
+  App._dragPath = null;
+  App._dragging = false;
+};
 
-  App._dragMarkers.push(marker);
-  App.mapObjects.push(marker);
+// Check if a pixel point is near the route path
+App._nearRoute = function(px, threshold) {
+  var path = App._dragPath;
+  if (!path || path.length < 2) return false;
+  for (var i = 0; i < path.length - 1; i++) {
+    var a = App.map.latLngToContainerPoint(path[i]);
+    var b = App.map.latLngToContainerPoint(path[i + 1]);
+    if (App._pointToSegmentDist(px, a, b) <= threshold) return true;
+  }
+  return false;
+};
 
-  marker.addListener('dragend', function() {
-    App._rerouteFromDragMarkers();
-  });
-
-  // Right-click to remove waypoint
-  marker.addListener('rightclick', function() {
-    marker.setMap(null);
-    App._dragMarkers = App._dragMarkers.filter(function(m) { return m !== marker; });
-    App._rerouteFromDragMarkers();
-  });
-
-  App._rerouteFromDragMarkers();
+// Distance from point P to line segment AB (in pixel space)
+App._pointToSegmentDist = function(p, a, b) {
+  var dx = b.x - a.x, dy = b.y - a.y;
+  var lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.sqrt((p.x - a.x) * (p.x - a.x) + (p.y - a.y) * (p.y - a.y));
+  var t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  var projX = a.x + t * dx, projY = a.y + t * dy;
+  return Math.sqrt((p.x - projX) * (p.x - projX) + (p.y - projY) * (p.y - projY));
 };
 
 App._rerouteFromDragMarkers = async function() {
@@ -535,10 +637,9 @@ App._rerouteFromDragMarkers = async function() {
     var shelters = App._dragShelters;
     var radius = App._dragRadius;
 
-    // Order drag markers along the original route direction (by lng/lat proximity to orig)
     var waypoints = App._dragMarkers
-      .filter(function(m) { return m.getMap(); })
-      .map(function(m) { return m.getPosition(); });
+      .filter(function(m) { return App.map.hasLayer(m); })
+      .map(function(m) { return m.getLatLng(); });
 
     App.setStatus(App.t('statusGettingRoute'), 'info');
 
@@ -551,8 +652,8 @@ App._rerouteFromDragMarkers = async function() {
       // Remove old route polylines (keep markers, circles, endpoints)
       var toKeep = [];
       App.mapObjects.forEach(function(obj) {
-        if (obj instanceof google.maps.Polyline && obj !== App._dragOverlay) {
-          obj.setMap(null);
+        if (obj instanceof L.Polyline && !(obj instanceof L.CircleMarker)) {
+          obj.remove();
         } else {
           toKeep.push(obj);
         }
@@ -560,9 +661,7 @@ App._rerouteFromDragMarkers = async function() {
       App.mapObjects = toKeep;
 
       App.drawRoute(analysis.coveredPolyline, analysis.gapPolylines, analysis.gaps);
-
-      // Update the drag overlay path
-      App._dragOverlay.setPath(newRoute.path);
+      App._dragPath = newRoute.path;
 
       App.renderScore(analysis.coveredPct, analysis.gaps, newRoute, shelters.length);
 
@@ -571,7 +670,6 @@ App._rerouteFromDragMarkers = async function() {
         : App.t('statusPartialCoverage')(Math.round(analysis.coveredPct));
       App.setStatus(pctLabel, analysis.coveredPct >= 99 ? 'ok' : analysis.coveredPct >= 70 ? 'info' : 'err');
 
-      // Debounced shelter list update
       clearTimeout(App._dragListTimer);
       App._dragListTimer = setTimeout(async function() {
         await App.renderShelterList(shelters, newRoute.path, radius);
@@ -588,9 +686,8 @@ App._rerouteFromDragMarkers = async function() {
 App.isPointCovered = function(point, shelters, radius) {
   var effectiveRadius = radius / App.WALK_FACTOR;
   for (var i = 0; i < shelters.length; i++) {
-    if (google.maps.geometry.spherical.computeDistanceBetween(point, shelters[i].location) <= effectiveRadius)
+    if (point.distanceTo(shelters[i].location) <= effectiveRadius)
       return true;
   }
   return false;
 };
-
