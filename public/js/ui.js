@@ -97,7 +97,7 @@ App.renderShelterList = async function(shelters, path, radius) {
   if (toggle) toggle.classList.remove('open');
   App.initShelterToggle();
 
-  var effectiveRadius = radius / App.WALK_FACTOR;
+  var effectiveRadius = radius * App.WALK_FACTOR;
   var nearby = shelters
     .map(function(s) {
       var result = App.closestOnPath(s.location, path);

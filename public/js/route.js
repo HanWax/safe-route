@@ -139,98 +139,148 @@ App.fetchShelters = async function(bbox, routePath) {
   return shelters;
 };
 
-// Build a shelter-hopping chain from origin to destination.
-// Inspired by miklat-run's bridgeShelters: greedily pick the next shelter
-// that (a) makes forward progress toward the destination, (b) is within
-// maxEdge metres of the current position, and (c) scores well on a
-// combination of progress, detour cost, and heading consistency.
-App._buildShelterChain = function(orig, dest, shelters, maxEdge) {
-  var chain = [];
-  var used = new Set();
-  var current = orig;
+// Build shelter-hopping chains from origin to destination using beam search.
+// Keeps the top beamWidth partial chains at each step so we explore multiple
+// corridors instead of committing to one greedy path.
+App._buildShelterChainBeam = function(orig, dest, shelters, maxEdge, beamWidth) {
+  beamWidth = beamWidth || 3;
   var straightLineDist = orig.distanceTo(dest);
   var maxSteps = Math.min(20, Math.ceil(straightLineDist / (maxEdge * 0.5)));
-  var chainDist = 0; // total walking distance accumulated
+  var maxChainDist = straightLineDist * 1.5;
+
+  // Each beam entry: { current, chain, used, chainDist }
+  var beams = [{ current: orig, chain: [], used: new Set(), chainDist: 0 }];
 
   for (var step = 0; step < maxSteps; step++) {
-    var distToTarget = current.distanceTo(dest);
-    if (distToTarget <= maxEdge) break; // can reach dest directly
+    var nextBeams = [];
 
-    var bestShelter = null;
-    var bestScore = -Infinity;
+    for (var bi = 0; bi < beams.length; bi++) {
+      var beam = beams[bi];
+      var distToTarget = beam.current.distanceTo(dest);
 
-    for (var i = 0; i < shelters.length; i++) {
-      var s = shelters[i];
-      if (used.has(s.id)) continue;
+      // This beam can reach destination directly — keep it as-is
+      if (distToTarget <= maxEdge) {
+        nextBeams.push(beam);
+        continue;
+      }
 
-      var dFromCurr = current.distanceTo(s.location);
-      if (dFromCurr > maxEdge || dFromCurr < 30) continue;
+      // Find top candidates for this beam
+      var candidates = [];
+      for (var i = 0; i < shelters.length; i++) {
+        var s = shelters[i];
+        if (beam.used.has(s.id)) continue;
 
-      var dToTarget = s.location.distanceTo(dest);
-      var progress = distToTarget - dToTarget;
-      // Must make at least 25% of maxEdge in forward progress (prevents lateral drift)
-      if (progress < maxEdge * 0.25) continue;
+        var dFromCurr = beam.current.distanceTo(s.location);
+        if (dFromCurr > maxEdge || dFromCurr < 30) continue;
 
-      var detour = dFromCurr + dToTarget - distToTarget;
-      // Penalise detour more heavily to keep route tight
-      var score = progress - detour * 1.5;
+        var dToTarget = s.location.distanceTo(dest);
+        var progress = distToTarget - dToTarget;
+        if (progress < maxEdge * 0.15) continue;
 
-      if (score > bestScore) {
-        bestScore = score;
-        bestShelter = s;
+        var detour = dFromCurr + dToTarget - distToTarget;
+        var score = progress - detour * 1.2;
+        candidates.push({ shelter: s, score: score, hopDist: dFromCurr });
+      }
+
+      candidates.sort(function(a, b) { return b.score - a.score; });
+
+      // Expand the top few candidates for this beam
+      var expandCount = Math.min(beamWidth, candidates.length);
+      if (expandCount === 0) {
+        nextBeams.push(beam); // dead end — keep as-is
+        continue;
+      }
+
+      for (var ci = 0; ci < expandCount; ci++) {
+        var c = candidates[ci];
+        var newChainDist = beam.chainDist + c.hopDist;
+        var remaining = c.shelter.location.distanceTo(dest);
+        if (newChainDist + remaining > maxChainDist) continue;
+
+        var newUsed = new Set(beam.used);
+        newUsed.add(c.shelter.id);
+        nextBeams.push({
+          current: c.shelter.location,
+          chain: beam.chain.concat([c.shelter]),
+          used: newUsed,
+          chainDist: newChainDist,
+        });
       }
     }
 
-    if (!bestShelter) break;
+    if (!nextBeams.length) break;
 
-    // Guard: don't let total chain distance exceed 1.4x the straight-line distance
-    var hopDist = current.distanceTo(bestShelter.location);
-    if (chainDist + hopDist + bestShelter.location.distanceTo(dest) > straightLineDist * 1.4) break;
-
-    chain.push(bestShelter);
-    used.add(bestShelter.id);
-    chainDist += hopDist;
-    current = bestShelter.location;
+    // Score each beam by chain length (more shelters = more coverage potential)
+    // and closeness to destination, then keep top beamWidth * 2
+    nextBeams.sort(function(a, b) {
+      var aDist = a.current.distanceTo(dest);
+      var bDist = b.current.distanceTo(dest);
+      var aScore = a.chain.length * 100 - aDist;
+      var bScore = b.chain.length * 100 - bDist;
+      return bScore - aScore;
+    });
+    beams = nextBeams.slice(0, beamWidth * 2);
   }
 
-  return chain;
+  return beams;
 };
 
 // Generate corridor candidate routes by building shelter-hopping chains
-// at different maxEdge distances, then routing through them via OSRM.
+// at different maxEdge distances in both directions, then routing via OSRM.
 App._buildCorridorCandidates = async function(orig, dest, shelters, radius, directRoute) {
   var MAX_DETOUR_RATIO = 1.5;
   var directDist = directRoute.totalDistance;
-  var effectiveRadius = radius / App.WALK_FACTOR;
+  var effectiveRadius = radius * App.WALK_FACTOR;
 
-  // Try multiple maxEdge values to produce different corridor shapes
   var edgeDistances = [
     effectiveRadius * 1.5,
     effectiveRadius * 2.5,
     effectiveRadius * 4,
   ];
 
-  var candidates = [];
+  // Collect unique chains from beam search in both directions
+  var allChains = [];
   var seenChainKeys = new Set();
 
   for (var ei = 0; ei < edgeDistances.length; ei++) {
-    var chain = App._buildShelterChain(orig, dest, shelters, edgeDistances[ei]);
-    if (chain.length < 2) continue;
+    var maxEdge = edgeDistances[ei];
 
-    // Deduplicate chains that picked the same shelters
-    var chainKey = chain.map(function(s) { return s.id; }).join(',');
-    if (seenChainKeys.has(chainKey)) continue;
-    seenChainKeys.add(chainKey);
+    // Forward: orig → dest
+    var forwardBeams = App._buildShelterChainBeam(orig, dest, shelters, maxEdge, 3);
+    for (var fi = 0; fi < forwardBeams.length; fi++) {
+      var chain = forwardBeams[fi].chain;
+      if (chain.length < 2) continue;
+      var key = chain.map(function(s) { return s.id; }).join(',');
+      if (!seenChainKeys.has(key)) {
+        seenChainKeys.add(key);
+        allChains.push(chain);
+      }
+    }
 
-    var waypoints = chain.map(function(s) { return L.latLng(s.lat, s.lon); });
+    // Reverse: dest → orig, then flip the chain
+    var reverseBeams = App._buildShelterChainBeam(dest, orig, shelters, maxEdge, 3);
+    for (var ri = 0; ri < reverseBeams.length; ri++) {
+      var rchain = reverseBeams[ri].chain.slice().reverse();
+      if (rchain.length < 2) continue;
+      var rkey = rchain.map(function(s) { return s.id; }).join(',');
+      if (!seenChainKeys.has(rkey)) {
+        seenChainKeys.add(rkey);
+        allChains.push(rchain);
+      }
+    }
+  }
 
+  // Route each unique chain through OSRM
+  var candidates = [];
+  for (var ci = 0; ci < allChains.length; ci++) {
+    var waypoints = allChains[ci].map(function(s) { return L.latLng(s.lat, s.lon); });
     try {
       var route = await App.getRoute(orig, dest, waypoints);
       if (route && route.totalDistance <= directDist * MAX_DETOUR_RATIO) {
         candidates.push(route);
       }
     } catch (e) {
-      console.warn('[corridor] Chain routing failed for edge=' + Math.round(edgeDistances[ei]) + 'm', e);
+      console.warn('[corridor] Chain routing failed', e);
     }
   }
 
@@ -282,138 +332,85 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
     return { waypointRoute: baseRoute, usedShelters: [], achievedPct: directCoverage.coveredPct };
   }
 
-  // --- Phase 2: Iterative waypoint optimisation on best base route ---
-  var gapPoints = baseRoute.path.filter(function(p) {
-    return !App.isPointCovered(p, shelters, radius);
-  });
+  // --- Phase 2: Targeted gap sub-routing ---
+  // Instead of dumping all gap-covering shelters as waypoints at once,
+  // identify the largest gaps and fix them one at a time with a single
+  // well-chosen waypoint per gap.
+  var effectiveRadius = radius * App.WALK_FACTOR;
+  var currentRoute = baseRoute;
+  var currentCoverage = directCoverage;
+  var allWaypoints = [];
+  var MAX_GAP_FIXES = 5;
 
-  if (!gapPoints.length) {
-    return { waypointRoute: baseRoute, usedShelters: [], achievedPct: 100 };
-  }
+  for (var gapIter = 0; gapIter < MAX_GAP_FIXES; gapIter++) {
+    if (currentCoverage.coveredPct >= coverageTarget) break;
+    if (allWaypoints.length >= MAX_WAYPOINTS) break;
 
-  var effectiveRadius = radius / App.WALK_FACTOR;
-  var directGapDist = directCoverage.gapDist || 0;
-  var bestRoute = null;
-  var bestGapDist = directGapDist;
-  var bestPct = directCoverage.coveredPct;
-  var bestShelters = [];
-  var usedIds = new Set();
-  var selectedShelters = [];
+    // Find the largest remaining gap
+    var gaps = currentCoverage.gaps || [];
+    if (!gaps.length) break;
 
-  for (var iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-    var currentPath = bestRoute ? bestRoute.path : baseRoute.path;
-    var currentGapPoints = currentPath.filter(function(p) { return !App.isPointCovered(p, shelters, radius); });
+    gaps.sort(function(a, b) { return b.distMeters - a.distMeters; });
+    var largestGap = gaps[0];
+    if (largestGap.distMeters < 50) break; // not worth fixing tiny gaps
 
-    if (!currentGapPoints.length || bestPct >= coverageTarget) break;
-    if (selectedShelters.length >= MAX_WAYPOINTS) break;
+    // Find the midpoint of the gap
+    var gapMid = largestGap.points[Math.floor(largestGap.points.length / 2)];
 
-    var candidates = shelters
-      .filter(function(s) { return !usedIds.has(s.id); })
-      .map(function(s) {
-        var coverCount = 0;
-        for (var j = 0; j < currentGapPoints.length; j++) {
-          if (currentGapPoints[j].distanceTo(s.location) <= effectiveRadius * 2) {
-            coverCount++;
-          }
-        }
-        var routeDist = App.minDistToPath(s.location, currentPath);
-        return { shelter: s, coverCount: coverCount, routeDist: routeDist };
-      })
-      .filter(function(x) { return x.coverCount > 0 && x.routeDist < radius * 2 / App.WALK_FACTOR; })
-      .sort(function(a, b) { return b.coverCount - a.coverCount || a.routeDist - b.routeDist; });
-
-    var batchSize = Math.min(8, MAX_WAYPOINTS - selectedShelters.length);
-    var added = 0;
-    for (var ci = 0; ci < candidates.length; ci++) {
-      if (added >= batchSize) break;
-      var c = candidates[ci];
-      if (!usedIds.has(c.shelter.id)) {
-        usedIds.add(c.shelter.id);
-        selectedShelters.push(c.shelter);
-        added++;
+    // Find the best shelter to pull the route toward this gap area.
+    // Pick the shelter closest to the gap midpoint that would actually
+    // provide coverage (within effectiveRadius * 2 of the gap).
+    var bestShelter = null;
+    var bestDist = Infinity;
+    for (var si = 0; si < shelters.length; si++) {
+      var s = shelters[si];
+      var d = gapMid.distanceTo(s.location);
+      if (d < bestDist && d < effectiveRadius * 2) {
+        bestDist = d;
+        bestShelter = s;
       }
     }
 
-    if (!added) break;
+    if (!bestShelter) break;
 
-    App.setStatus(App.t('statusRoutingWaypoints')(iteration + 1, selectedShelters.length), 'info');
+    allWaypoints.push(bestShelter);
+
+    App.setStatus(App.t('statusRoutingWaypoints')(gapIter + 1, allWaypoints.length), 'info');
 
     try {
-      var orderedShelters = App.orderWaypointsAlongPath(selectedShelters, baseRoute.path);
-      var waypoints = orderedShelters.map(function(s) { return L.latLng(s.lat, s.lon); });
-      var wpRoute = await App.getRoute(orig, dest, waypoints);
-      if (wpRoute) {
-        if (wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {
-          selectedShelters.length = 0;
-          bestShelters.forEach(function(s) { selectedShelters.push(s); });
-          usedIds.clear();
-          bestShelters.forEach(function(s) { usedIds.add(s.id); });
-          break;
-        }
-        var coverage = App.analyseRouteCoverage(wpRoute.path, shelters, radius);
-        var newGapDist = coverage.gapDist || 0;
-        if (newGapDist < bestGapDist) {
-          bestRoute = wpRoute;
-          bestGapDist = newGapDist;
-          bestPct = coverage.coveredPct;
-          bestShelters = selectedShelters.slice();
-        } else {
-          selectedShelters.length = 0;
-          bestShelters.forEach(function(s) { selectedShelters.push(s); });
-          usedIds.clear();
-          bestShelters.forEach(function(s) { usedIds.add(s.id); });
-          if (!bestRoute) break;
-        }
-        if (bestPct >= coverageTarget) break;
+      var orderedWaypoints = App.orderWaypointsAlongPath(allWaypoints, baseRoute.path);
+      var wpLatLngs = orderedWaypoints.map(function(s) { return L.latLng(s.lat, s.lon); });
+      var wpRoute = await App.getRoute(orig, dest, wpLatLngs);
+      if (!wpRoute) break;
+
+      if (wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {
+        allWaypoints.pop(); // revert this waypoint
+        break;
+      }
+
+      var newCoverage = App.analyseRouteCoverage(wpRoute.path, shelters, radius);
+      if ((newCoverage.gapDist || 0) < (currentCoverage.gapDist || 0)) {
+        currentRoute = wpRoute;
+        currentCoverage = newCoverage;
+      } else {
+        allWaypoints.pop(); // didn't help, revert
+        break;
       }
     } catch (e) {
-      console.warn('Waypoint route iteration ' + (iteration + 1) + ' failed', e);
+      console.warn('Gap fix iteration ' + (gapIter + 1) + ' failed', e);
+      allWaypoints.pop();
       break;
     }
   }
 
-  if (bestRoute) {
-    if (bestPct < coverageTarget) {
-      App.setStatus(App.t('statusBestAchievable')(bestPct), 'info');
+  if (currentRoute !== directRoute || currentCoverage.coveredPct > directCov.coveredPct) {
+    if (currentCoverage.coveredPct < coverageTarget) {
+      App.setStatus(App.t('statusBestAchievable')(currentCoverage.coveredPct), 'info');
     }
-    return { waypointRoute: bestRoute, usedShelters: bestShelters, achievedPct: bestPct };
+    return { waypointRoute: currentRoute, usedShelters: allWaypoints, achievedPct: currentCoverage.coveredPct };
   }
 
-  // --- Phase 3: Fallback nearest-shelter approach ---
-  var waypointShelterSet = new Set();
-  var waypointShelters = [];
-  for (var gi = 0; gi < gapPoints.length; gi++) {
-    var nearest = null, nearestD = Infinity;
-    for (var si = 0; si < shelters.length; si++) {
-      var d = gapPoints[gi].distanceTo(shelters[si].location);
-      if (d < nearestD) { nearestD = d; nearest = shelters[si]; }
-    }
-    if (nearest && !waypointShelterSet.has(nearest.id) && nearestD < (radius * 2) / App.WALK_FACTOR) {
-      waypointShelterSet.add(nearest.id);
-      waypointShelters.push(nearest);
-    }
-    if (waypointShelters.length >= MAX_WAYPOINTS) break;
-  }
-
-  if (!waypointShelters.length) return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
-
-  try {
-    var orderedFallback = App.orderWaypointsAlongPath(waypointShelters, baseRoute.path);
-    var waypoints = orderedFallback.map(function(s) { return L.latLng(s.lat, s.lon); });
-    var wpRoute = await App.getRoute(orig, dest, waypoints);
-    if (wpRoute && wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {
-      return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
-    }
-    var fallbackCoverage = wpRoute ? App.analyseRouteCoverage(wpRoute.path, shelters, radius) : null;
-    var fallbackGapDist = fallbackCoverage ? (fallbackCoverage.gapDist || 0) : Infinity;
-    if (fallbackGapDist < directGapDist) {
-      return { waypointRoute: wpRoute, usedShelters: waypointShelters, achievedPct: fallbackCoverage.coveredPct };
-    }
-    return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
-  } catch (e) {
-    console.warn('Waypoint route failed, falling back', e);
-    return { waypointRoute: directRoute, usedShelters: [], achievedPct: directCoverage.coveredPct };
-  }
+  return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
 };
 
 App.orderWaypointsAlongPath = function(shelters, path) {
@@ -474,7 +471,7 @@ App.analyseRouteCoverage = function(path, shelters, radius) {
 };
 
 App.isPointCovered = function(point, shelters, radius) {
-  var effectiveRadius = radius / App.WALK_FACTOR;
+  var effectiveRadius = radius * App.WALK_FACTOR;
   for (var i = 0; i < shelters.length; i++) {
     if (point.distanceTo(shelters[i].location) <= effectiveRadius)
       return true;

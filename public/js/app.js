@@ -275,7 +275,7 @@ App.run = async function() {
     var analysis = App.analyseRouteCoverage(finalRoute.path, shelters, radius);
 
     App.drawRoute(analysis.coveredPolyline, analysis.gapPolylines, analysis.gaps);
-    App.drawShelterCircles(shelters, radius / App.WALK_FACTOR);
+    App.drawShelterCircles(shelters, radius * App.WALK_FACTOR);
     App.drawShelterMarkers(shelters, buildResult.usedShelters);
     App.drawEndpoints(finalRoute);
     App.fitAll(finalRoute, shelters);
