@@ -9,7 +9,7 @@ App.loadMaps = function(key) {
     s.id = '_gms';
     var mapsLang = App.currentLang === 'he' ? 'iw' : 'en';
     s.src = 'https://maps.googleapis.com/maps/api/js?key=' + key + '&libraries=places,geometry&callback=__mapsLoaded&language=' + mapsLang + '&loading=async';
-    s.onerror = function() { rej(new Error('Failed to load Google Maps \u2014 check your API key and that Maps JS API + Directions API are enabled.')); };
+    s.onerror = function() { rej(new Error('Failed to load Google Maps \u2014 check your API key and that Maps JS API is enabled.')); };
     document.head.appendChild(s);
   });
 };
@@ -32,14 +32,6 @@ App.initMap = function() {
       { featureType:'landscape.man_made', elementType:'geometry', stylers:[{color:'#ece6dc'}] },
     ],
   });
-  App.dirSvc = new google.maps.DirectionsService();
-  App.dirRenderer = new google.maps.DirectionsRenderer({
-    suppressMarkers: true,
-    preserveViewport: true,
-    polylineOptions: { strokeOpacity: 0 },
-  });
-  App.dirRenderer.setMap(App.map);
-
   App.map.addListener('click', function() {
     App.closeAllIW();
     if (App._routeInfoWindow) { App._routeInfoWindow.close(); App._routeInfoWindow = null; }
@@ -278,16 +270,12 @@ App.clearAll = function() {
     App.communityMarkers.forEach(function(o) { if (o.setMap) o.setMap(null); else if (o.close) o.close(); });
     App.communityMarkers = [];
   }
-  if (App.dirRenderer) App.dirRenderer.setDirections({ routes: [] });
-  if (App.draggableRenderer) {
-    App.draggableRenderer.setMap(null);
-    App.draggableRenderer = null;
-  }
-
   if (App._routeInfoWindow) {
     App._routeInfoWindow.close();
     App._routeInfoWindow = null;
   }
+  if (App._dragOverlay) { App._dragOverlay = null; }
+  if (App._dragMarkers) { App._dragMarkers = []; }
 
   document.getElementById('scoreWrap').classList.remove('show');
   document.getElementById('shareRow').style.display = 'none';
@@ -296,7 +284,6 @@ App.clearAll = function() {
   document.getElementById('shelterList').innerHTML = '';
   document.getElementById('legend').classList.remove('show');
   document.getElementById('emptyState').style.display = 'none';
-  document.getElementById('dragHint').classList.remove('show');
 
   var bsContent = document.getElementById('bottomSheetContent');
   if (bsContent) bsContent.innerHTML = '';

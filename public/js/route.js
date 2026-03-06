@@ -467,6 +467,124 @@ App.analyseRouteCoverage = function(path, shelters, radius) {
   return { coveredPct: coveredPct, gaps: gaps, coveredPolyline: coveredSegs, gapPolylines: gapSegs, gapDist: Math.round(gapDist) };
 };
 
+App.setupDraggableRoute = function(orig, dest, finalRoute, shelters, radius) {
+  // Clean up previous drag state
+  if (App._dragOverlay) { App._dragOverlay.setMap(null); App._dragOverlay = null; }
+  if (App._dragMarkers) { App._dragMarkers.forEach(function(m) { m.setMap(null); }); }
+  App._dragMarkers = [];
+  App._dragOrig = orig;
+  App._dragDest = dest;
+  App._dragShelters = shelters;
+  App._dragRadius = radius;
+
+  // Invisible thick polyline for click detection
+  App._dragOverlay = new google.maps.Polyline({
+    path: finalRoute.path,
+    map: App.map,
+    strokeOpacity: 0,
+    strokeWeight: 20,
+    zIndex: 15,
+    clickable: true,
+  });
+  App.mapObjects.push(App._dragOverlay);
+
+  App._dragOverlay.addListener('click', function(e) {
+    App._addDragWaypoint(e.latLng);
+  });
+};
+
+App._addDragWaypoint = function(latLng) {
+  var marker = new google.maps.Marker({
+    position: latLng,
+    map: App.map,
+    draggable: true,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 8,
+      fillColor: '#1A4DE8',
+      fillOpacity: 0.9,
+      strokeColor: '#fff',
+      strokeWeight: 2,
+    },
+    zIndex: 25,
+    title: 'Drag to adjust route',
+  });
+
+  App._dragMarkers.push(marker);
+  App.mapObjects.push(marker);
+
+  marker.addListener('dragend', function() {
+    App._rerouteFromDragMarkers();
+  });
+
+  // Right-click to remove waypoint
+  marker.addListener('rightclick', function() {
+    marker.setMap(null);
+    App._dragMarkers = App._dragMarkers.filter(function(m) { return m !== marker; });
+    App._rerouteFromDragMarkers();
+  });
+
+  App._rerouteFromDragMarkers();
+};
+
+App._rerouteFromDragMarkers = async function() {
+  if (App._dragDebounce) clearTimeout(App._dragDebounce);
+  App._dragDebounce = setTimeout(async function() {
+    var orig = App._dragOrig;
+    var dest = App._dragDest;
+    var shelters = App._dragShelters;
+    var radius = App._dragRadius;
+
+    // Order drag markers along the original route direction (by lng/lat proximity to orig)
+    var waypoints = App._dragMarkers
+      .filter(function(m) { return m.getMap(); })
+      .map(function(m) { return m.getPosition(); });
+
+    App.setStatus(App.t('statusGettingRoute'), 'info');
+
+    try {
+      var newRoute = await App.getRoute(orig, dest, waypoints);
+      if (!newRoute) return;
+
+      var analysis = App.analyseRouteCoverage(newRoute.path, shelters, radius);
+
+      // Remove old route polylines (keep markers, circles, endpoints)
+      var toKeep = [];
+      App.mapObjects.forEach(function(obj) {
+        if (obj instanceof google.maps.Polyline && obj !== App._dragOverlay) {
+          obj.setMap(null);
+        } else {
+          toKeep.push(obj);
+        }
+      });
+      App.mapObjects = toKeep;
+
+      App.drawRoute(analysis.coveredPolyline, analysis.gapPolylines, analysis.gaps);
+
+      // Update the drag overlay path
+      App._dragOverlay.setPath(newRoute.path);
+
+      App.renderScore(analysis.coveredPct, analysis.gaps, newRoute, shelters.length);
+
+      var pctLabel = analysis.coveredPct >= 99
+        ? App.t('statusFullCoverage')
+        : App.t('statusPartialCoverage')(Math.round(analysis.coveredPct));
+      App.setStatus(pctLabel, analysis.coveredPct >= 99 ? 'ok' : analysis.coveredPct >= 70 ? 'info' : 'err');
+
+      // Debounced shelter list update
+      clearTimeout(App._dragListTimer);
+      App._dragListTimer = setTimeout(async function() {
+        await App.renderShelterList(shelters, newRoute.path, radius);
+        if (App.isMobile()) App.populateBottomSheet();
+      }, 800);
+
+      if (App.isMobile()) App.populateBottomSheet();
+    } catch (e) {
+      console.warn('Drag re-route failed', e);
+    }
+  }, 200);
+};
+
 App.isPointCovered = function(point, shelters, radius) {
   var effectiveRadius = radius / App.WALK_FACTOR;
   for (var i = 0; i < shelters.length; i++) {
