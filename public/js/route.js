@@ -10,7 +10,22 @@ App._formatDuration = function(seconds) {
   return Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min';
 };
 
-App.getRoute = function(origin, destination, waypoints) {
+App._parseOsrmRoute = function(route) {
+  var allPoints = route.geometry.coordinates.map(function(c) {
+    return L.latLng(c[1], c[0]);
+  });
+  return {
+    path: allPoints,
+    distance: App._formatDistance(route.distance),
+    duration: App._formatDuration(route.duration),
+    totalDistance: Math.round(route.distance),
+    totalDuration: Math.round(route.duration),
+    startLocation: allPoints[0],
+    endLocation: allPoints[allPoints.length - 1],
+  };
+};
+
+App.getRoute = function(origin, destination, waypoints, options) {
   // Build OSRM coordinate string: lng,lat;lng,lat;...
   var coords = [];
   coords.push(origin.lng + ',' + origin.lat);
@@ -21,8 +36,9 @@ App.getRoute = function(origin, destination, waypoints) {
   }
   coords.push(destination.lng + ',' + destination.lat);
 
+  var alternatives = (options && options.alternatives) ? '&alternatives=true' : '';
   var url = 'https://router.project-osrm.org/route/v1/foot/' + coords.join(';') +
-    '?overview=full&geometries=geojson&steps=true';
+    '?overview=full&geometries=geojson&steps=true' + alternatives;
 
   return fetch(url)
     .then(function(res) { return res.json(); })
@@ -32,23 +48,11 @@ App.getRoute = function(origin, destination, waypoints) {
         return null;
       }
 
-      var route = data.routes[0];
-      var allPoints = route.geometry.coordinates.map(function(c) {
-        return L.latLng(c[1], c[0]);
-      });
+      if (options && options.alternatives && data.routes.length > 1) {
+        return data.routes.map(App._parseOsrmRoute);
+      }
 
-      var totalDistance = route.distance; // meters
-      var totalDuration = route.duration; // seconds
-
-      return {
-        path: allPoints,
-        distance: App._formatDistance(totalDistance),
-        duration: App._formatDuration(totalDuration),
-        totalDistance: Math.round(totalDistance),
-        totalDuration: Math.round(totalDuration),
-        startLocation: allPoints[0],
-        endLocation: allPoints[allPoints.length - 1],
-      };
+      return App._parseOsrmRoute(data.routes[0]);
     })
     .catch(function(err) {
       App.setStatus('Route error: ' + err.message, 'err');
@@ -139,17 +143,31 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   var coverageTarget = 100;
   if (!shelters.length) return { waypointRoute: null, usedShelters: [], achievedPct: 0 };
 
-  var directCoverage = App.analyseRouteCoverage(directRoute.path, shelters, radius);
-  if (directCoverage.coveredPct >= coverageTarget) {
-    return { waypointRoute: directRoute, usedShelters: [], achievedPct: directCoverage.coveredPct };
+  // Pick the best base route from available alternatives
+  var baseRoute = directRoute;
+  if (directRoute._alternatives && directRoute._alternatives.length) {
+    var bestBasePct = App.analyseRouteCoverage(directRoute.path, shelters, radius).coveredPct;
+    for (var ai = 0; ai < directRoute._alternatives.length; ai++) {
+      var alt = directRoute._alternatives[ai];
+      var altCov = App.analyseRouteCoverage(alt.path, shelters, radius);
+      if (altCov.coveredPct > bestBasePct) {
+        bestBasePct = altCov.coveredPct;
+        baseRoute = alt;
+      }
+    }
   }
 
-  var gapPoints = directRoute.path.filter(function(p) {
+  var directCoverage = App.analyseRouteCoverage(baseRoute.path, shelters, radius);
+  if (directCoverage.coveredPct >= coverageTarget) {
+    return { waypointRoute: baseRoute, usedShelters: [], achievedPct: directCoverage.coveredPct };
+  }
+
+  var gapPoints = baseRoute.path.filter(function(p) {
     return !App.isPointCovered(p, shelters, radius);
   });
 
   if (!gapPoints.length) {
-    return { waypointRoute: directRoute, usedShelters: [], achievedPct: 100 };
+    return { waypointRoute: baseRoute, usedShelters: [], achievedPct: 100 };
   }
 
   var effectiveRadius = radius / App.WALK_FACTOR;
@@ -163,10 +181,10 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   var MAX_WAYPOINTS = 23;
   var MAX_ITERATIONS = 3;
   var MAX_DETOUR_RATIO = 1.5;
-  var directDist = directRoute.totalDistance;
+  var directDist = baseRoute.totalDistance;
 
   for (var iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-    var currentPath = bestRoute ? bestRoute.path : directRoute.path;
+    var currentPath = bestRoute ? bestRoute.path : baseRoute.path;
     var currentGapPoints = currentPath.filter(function(p) { return !App.isPointCovered(p, shelters, radius); });
 
     if (!currentGapPoints.length || bestPct >= coverageTarget) break;
@@ -204,7 +222,7 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
     App.setStatus(App.t('statusRoutingWaypoints')(iteration + 1, selectedShelters.length), 'info');
 
     try {
-      var orderedShelters = App.orderWaypointsAlongPath(selectedShelters, directRoute.path);
+      var orderedShelters = App.orderWaypointsAlongPath(selectedShelters, baseRoute.path);
       var waypoints = orderedShelters.map(function(s) { return L.latLng(s.lat, s.lon); });
       var wpRoute = await App.getRoute(orig, dest, waypoints);
       if (wpRoute) {
@@ -263,7 +281,7 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   if (!waypointShelters.length) return { waypointRoute: null, usedShelters: [], achievedPct: directCoverage.coveredPct };
 
   try {
-    var orderedFallback = App.orderWaypointsAlongPath(waypointShelters, directRoute.path);
+    var orderedFallback = App.orderWaypointsAlongPath(waypointShelters, baseRoute.path);
     var waypoints = orderedFallback.map(function(s) { return L.latLng(s.lat, s.lon); });
     var wpRoute = await App.getRoute(orig, dest, waypoints);
     if (wpRoute && wpRoute.totalDistance > directDist * MAX_DETOUR_RATIO) {

@@ -236,9 +236,20 @@ App.run = async function() {
     App.clearAll();
     App.setStatus(App.t('statusGettingRoute'), 'info');
 
-    var directRoute = await App.getRoute(orig, dest);
-    if (!directRoute) return;
+    var routeResult = await App.getRoute(orig, dest, null, { alternatives: true });
+    if (!routeResult) return;
     if (runId !== App._runId) return;
+
+    // getRoute returns an array when alternatives are requested
+    var directRoute, altRoutes;
+    if (Array.isArray(routeResult)) {
+      directRoute = routeResult[0];
+      altRoutes = routeResult.slice(1);
+    } else {
+      directRoute = routeResult;
+      altRoutes = [];
+    }
+    directRoute._alternatives = altRoutes;
 
     var bbox = App.getPathBbox(directRoute.path, 0.012);
     var cities = App.detectCities(directRoute.path);
