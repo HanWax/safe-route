@@ -1,41 +1,73 @@
 window.App = window.App || {};
 
+App.nominatimGeocode = function(query) {
+  return fetch('https://nominatim.openstreetmap.org/search?' + new URLSearchParams({
+    q: query, format: 'json', limit: 1, countrycodes: 'il',
+  }))
+  .then(function(r) { return r.json(); })
+  .then(function(results) {
+    if (results.length) return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+    return null;
+  });
+};
+
+App.nominatimReverse = function(lat, lng) {
+  return fetch('https://nominatim.openstreetmap.org/reverse?' + new URLSearchParams({
+    lat: lat, lon: lng, format: 'json',
+  }))
+  .then(function(r) { return r.json(); })
+  .then(function(result) {
+    return result && result.display_name ? result.display_name : null;
+  });
+};
+
+App._extractLatLng = function(loc) {
+  return {
+    lat: typeof loc.lat === 'function' ? loc.lat() : loc.lat,
+    lng: typeof loc.lng === 'function' ? loc.lng() : loc.lng,
+  };
+};
+
 App.getRoute = function(origin, destination, waypoints) {
-  return new Promise(function(res) {
-    var req = {
-      origin: origin,
-      destination: destination,
-      travelMode: google.maps.TravelMode.WALKING,
-    };
-    if (waypoints && waypoints.length) {
-      req.waypoints = waypoints.map(function(w) { return { location: w, stopover: false }; });
-      req.optimizeWaypoints = false;
-    }
-    App.dirSvc.route(req, function(result, status) {
-      if (status !== 'OK') {
-        App.setStatus('Route error: ' + status, 'err');
-        return res(null);
-      }
-      var leg0 = result.routes[0].legs[0];
-      var lastLeg = result.routes[0].legs[result.routes[0].legs.length - 1];
-      var allPoints = [];
-      result.routes[0].legs.forEach(function(leg) {
-        leg.steps.forEach(function(step) {
-          var pts = google.maps.geometry.encoding.decodePath(step.polyline.points);
-          allPoints = allPoints.concat(pts);
-        });
-      });
-      res({
-        result: result,
-        path: allPoints,
-        distance: leg0.distance.text,
-        duration: leg0.duration.text,
-        totalDistance: result.routes[0].legs.reduce(function(s, l) { return s + l.distance.value; }, 0),
-        totalDuration: result.routes[0].legs.reduce(function(s, l) { return s + l.duration.value; }, 0),
-        startLocation: leg0.start_location,
-        endLocation: lastLeg.end_location,
-      });
+  var o = App._extractLatLng(origin);
+  var d = App._extractLatLng(destination);
+  var locations = [{ lat: o.lat, lon: o.lng }];
+  if (waypoints && waypoints.length) {
+    waypoints.forEach(function(w) {
+      var c = App._extractLatLng(w);
+      locations.push({ lat: c.lat, lon: c.lng, type: 'through' });
     });
+  }
+  locations.push({ lat: d.lat, lon: d.lng });
+
+  return fetch('https://valhalla1.openstreetmap.de/route', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ locations: locations, costing: 'pedestrian', directions_options: { units: 'kilometers' } }),
+  })
+  .then(function(resp) {
+    if (!resp.ok) throw new Error('Route request failed (' + resp.status + ')');
+    return resp.json();
+  })
+  .then(function(data) {
+    if (!data.trip) { App.setStatus('Route error: no trip data', 'err'); return null; }
+    var allPoints = [];
+    data.trip.legs.forEach(function(leg) {
+      allPoints = allPoints.concat(App._decodeValhalla(leg.shape));
+    });
+    var totalDistance = Math.round(data.trip.summary.length * 1000);
+    var totalDuration = Math.round(data.trip.summary.time);
+    return {
+      path: allPoints,
+      totalDistance: totalDistance,
+      totalDuration: totalDuration,
+      startLocation: allPoints[0],
+      endLocation: allPoints[allPoints.length - 1],
+    };
+  })
+  .catch(function(err) {
+    App.setStatus('Route error: ' + err.message, 'err');
+    return null;
   });
 };
 
@@ -145,7 +177,7 @@ App._getValhallaAlternatives = async function(orig, dest) {
       { lat: dest.lat(), lon: dest.lng() },
     ],
     costing: 'pedestrian',
-    alternates: 2,
+    alternates: 5,
   });
   try {
     var resp = await fetch('https://valhalla1.openstreetmap.de/route', {
@@ -332,7 +364,7 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
 
   if (bestRoute) {
     if (bestPct < coverageTarget) {
-      App.setStatus(App.t('statusBestAchievable')(bestPct), 'info');
+      App.setStatus(App.t('statusBestAchievable')(Math.round(bestPct)), 'info');
     }
     return { waypointRoute: bestRoute, usedShelters: bestShelters, achievedPct: bestPct };
   }
@@ -427,7 +459,7 @@ App.analyseRouteCoverage = function(path, shelters, radius) {
   });
 
   var total = coveredDist + gapDist;
-  var coveredPct = total > 0 ? Math.round((coveredDist / total) * 100) : 100;
+  var coveredPct = total > 0 ? Math.round((coveredDist / total) * 10000) / 100 : 100;
 
   return { coveredPct: coveredPct, gaps: gaps, coveredPolyline: coveredSegs, gapPolylines: gapSegs, gapDist: Math.round(gapDist) };
 };
@@ -441,81 +473,4 @@ App.isPointCovered = function(point, shelters, radius) {
   return false;
 };
 
-App.setupDraggableRoute = function(route, shelters, radius) {
-  if (App.draggableRenderer) {
-    App.draggableRenderer.setMap(null);
-    App.draggableRenderer = null;
-  }
-
-  App.draggableRenderer = new google.maps.DirectionsRenderer({
-    map: App.map,
-    directions: route.result,
-    draggable: true,
-    suppressMarkers: true,
-    preserveViewport: true,
-    polylineOptions: {
-      strokeOpacity: 0,
-      strokeWeight: 12,
-      zIndex: 10,
-    },
-  });
-  App.mapObjects.push(App.draggableRenderer);
-
-  google.maps.event.addListener(App.draggableRenderer, 'directions_changed', function() {
-    var newDirections = App.draggableRenderer.getDirections();
-    if (!newDirections || !newDirections.routes || !newDirections.routes[0]) return;
-
-    var allPoints = [];
-    newDirections.routes[0].legs.forEach(function(leg) {
-      leg.steps.forEach(function(step) {
-        var pts = google.maps.geometry.encoding.decodePath(step.polyline.points);
-        allPoints = allPoints.concat(pts);
-      });
-    });
-
-    var totalDistance = newDirections.routes[0].legs.reduce(function(s, l) { return s + l.distance.value; }, 0);
-    var totalDuration = newDirections.routes[0].legs.reduce(function(s, l) { return s + l.duration.value; }, 0);
-
-    var draggedRoute = {
-      result: newDirections,
-      path: allPoints,
-      totalDistance: totalDistance,
-      totalDuration: totalDuration,
-      startLocation: newDirections.routes[0].legs[0].start_location,
-      endLocation: newDirections.routes[0].legs[newDirections.routes[0].legs.length - 1].end_location,
-    };
-
-    App.reanalyseDraggedRoute(draggedRoute, shelters, radius);
-  });
-};
-
-App.reanalyseDraggedRoute = function(draggedRoute, shelters, radius) {
-  var toKeep = [];
-  App.mapObjects.forEach(function(obj) {
-    if (obj instanceof google.maps.Polyline && obj !== App.draggableRenderer) {
-      obj.setMap(null);
-    } else {
-      toKeep.push(obj);
-    }
-  });
-  App.mapObjects = toKeep;
-
-  var result = App.analyseRouteCoverage(draggedRoute.path, shelters, radius);
-
-  App.drawRoute(result.coveredPolyline, result.gapPolylines, result.gaps);
-
-  App.renderScore(result.coveredPct, result.gaps, draggedRoute, shelters.length);
-
-  var pctLabel = result.coveredPct >= 99
-    ? App.t('statusFullCoverage')
-    : App.t('statusPartialCoverage')(result.coveredPct);
-  App.setStatus(pctLabel, result.coveredPct >= 99 ? 'ok' : result.coveredPct >= 70 ? 'info' : 'err');
-
-  clearTimeout(App.shelterListUpdateTimer);
-  App.shelterListUpdateTimer = setTimeout(async function() {
-    await App.renderShelterList(shelters, draggedRoute.path, radius);
-    if (App.isMobile()) App.populateBottomSheet();
-  }, 800);
-
-  if (App.isMobile()) App.populateBottomSheet();
-};
+App.setupDraggableRoute = function() {};
