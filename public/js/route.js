@@ -28,7 +28,21 @@ App._extractLatLng = function(loc) {
   };
 };
 
-App.getRoute = function(origin, destination, waypoints) {
+App._parseValhallaTrip = function(trip) {
+  var allPoints = [];
+  trip.legs.forEach(function(leg) {
+    allPoints = allPoints.concat(App._decodeValhalla(leg.shape));
+  });
+  return {
+    path: allPoints,
+    totalDistance: Math.round(trip.summary.length * 1000),
+    totalDuration: Math.round(trip.summary.time),
+    startLocation: allPoints[0],
+    endLocation: allPoints[allPoints.length - 1],
+  };
+};
+
+App.getRoute = function(origin, destination, waypoints, options) {
   var o = App._extractLatLng(origin);
   var d = App._extractLatLng(destination);
   var locations = [{ lat: o.lat, lon: o.lng }];
@@ -40,10 +54,13 @@ App.getRoute = function(origin, destination, waypoints) {
   }
   locations.push({ lat: d.lat, lon: d.lng });
 
+  var body = { locations: locations, costing: 'pedestrian', directions_options: { units: 'kilometers' } };
+  if (options && options.alternates) body.alternates = options.alternates;
+
   return fetch('https://valhalla1.openstreetmap.de/route', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ locations: locations, costing: 'pedestrian', directions_options: { units: 'kilometers' } }),
+    body: JSON.stringify(body),
   })
   .then(function(resp) {
     if (!resp.ok) throw new Error('Route request failed (' + resp.status + ')');
@@ -51,19 +68,16 @@ App.getRoute = function(origin, destination, waypoints) {
   })
   .then(function(data) {
     if (!data.trip) { App.setStatus('Route error: no trip data', 'err'); return null; }
-    var allPoints = [];
-    data.trip.legs.forEach(function(leg) {
-      allPoints = allPoints.concat(App._decodeValhalla(leg.shape));
-    });
-    var totalDistance = Math.round(data.trip.summary.length * 1000);
-    var totalDuration = Math.round(data.trip.summary.time);
-    return {
-      path: allPoints,
-      totalDistance: totalDistance,
-      totalDuration: totalDuration,
-      startLocation: allPoints[0],
-      endLocation: allPoints[allPoints.length - 1],
-    };
+    var primary = App._parseValhallaTrip(data.trip);
+    if (options && options.alternates) {
+      primary.alternatives = [];
+      if (data.alternates) {
+        data.alternates.forEach(function(alt) {
+          if (alt.trip) primary.alternatives.push(App._parseValhallaTrip(alt.trip));
+        });
+      }
+    }
+    return primary;
   })
   .catch(function(err) {
     App.setStatus('Route error: ' + err.message, 'err');
@@ -170,37 +184,6 @@ App._decodeValhalla = function(encoded) {
   return decoded;
 };
 
-App._getValhallaAlternatives = async function(orig, dest) {
-  var body = JSON.stringify({
-    locations: [
-      { lat: orig.lat(), lon: orig.lng() },
-      { lat: dest.lat(), lon: dest.lng() },
-    ],
-    costing: 'pedestrian',
-    alternates: 5,
-  });
-  try {
-    var resp = await fetch('https://valhalla1.openstreetmap.de/route', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: body,
-    });
-    var data = await resp.json();
-    var routes = [];
-    if (data.trip) routes.push(data.trip);
-    if (data.alternates) {
-      data.alternates.forEach(function(alt) { if (alt.trip) routes.push(alt.trip); });
-    }
-    return routes.map(function(trip) {
-      var shape = trip.legs[0].shape;
-      return App._decodeValhalla(shape);
-    });
-  } catch (e) {
-    console.warn('Valhalla alternatives fetch failed', e);
-    return [];
-  }
-};
-
 App._pickBestCorridor = function(directPath, altPaths, shelters, radius) {
   var bestPath = directPath;
   var bestCoverage = App.analyseRouteCoverage(directPath, shelters, radius);
@@ -218,7 +201,7 @@ App._pickBestCorridor = function(directPath, altPaths, shelters, radius) {
 };
 
 App._extractCorridorWaypoints = function(corridorPath, numWaypoints) {
-  // Sample evenly-spaced points along the corridor to use as Google waypoints
+  // Sample evenly-spaced points along the corridor to use as route waypoints
   if (corridorPath.length < 3) return [];
   var step = Math.floor(corridorPath.length / (numWaypoints + 1));
   var waypoints = [];
@@ -235,13 +218,11 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
 
   var directCoverage = App.analyseRouteCoverage(directRoute.path, shelters, radius);
 
-  // Explore alternative corridors via Valhalla
-  var altPaths = await App._getValhallaAlternatives(
-    directRoute.startLocation, directRoute.endLocation
-  );
+  // Explore alternative corridors from the initial Valhalla response
+  var altPaths = (directRoute.alternatives || []).map(function(alt) { return alt.path; });
   var corridor = App._pickBestCorridor(directRoute.path, altPaths, shelters, radius);
 
-  // If a Valhalla alternative is better, re-route Google through that corridor
+  // If an alternative corridor is better, re-route through it with waypoints
   if (corridor.path !== directRoute.path && corridor.coverage.coveredPct > directCoverage.coveredPct) {
     var corridorWps = App._extractCorridorWaypoints(corridor.path, 5);
     try {
@@ -473,4 +454,3 @@ App.isPointCovered = function(point, shelters, radius) {
   return false;
 };
 
-App.setupDraggableRoute = function() {};
