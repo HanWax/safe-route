@@ -1,11 +1,31 @@
 const playwright = require('playwright-core');
 
+const LAMBDA_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-gpu',
+  '--disable-gpu-sandbox',
+  '--disable-software-rasterizer',
+  '--disable-dev-shm-usage',
+  '--disable-extensions',
+  '--disable-background-networking',
+  '--disable-sync',
+  '--disable-translate',
+  '--metrics-recording-only',
+  '--mute-audio',
+  '--no-first-run',
+  '--no-zygote',
+  '--disable-gpu-compositing',
+];
+
 async function getBrowser() {
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
     const chromium = require('@sparticuz/chromium');
+    chromium.setHeadlessMode = true;
+    chromium.setGraphicsMode = false;
     return playwright.chromium.launch({
       executablePath: await chromium.executablePath(),
-      args: chromium.args,
+      args: [...chromium.args, ...LAMBDA_ARGS],
       headless: true,
     });
   }
@@ -39,17 +59,18 @@ module.exports = async function handler(req, res) {
   try {
     browser = await getBrowser();
     const page = await browser.newPage();
-    // Large viewport for detailed map with readable street names
     await page.setViewportSize({ width: 1400, height: 1000 });
 
-    const baseUrl = process.env.VERCEL_URL
-      ? 'https://' + process.env.VERCEL_URL
+    // Use the production domain directly instead of VERCEL_URL
+    // (VERCEL_URL can point to preview deployments)
+    const baseUrl = process.env.VERCEL
+      ? 'https://safe-route-lake.vercel.app'
       : 'http://localhost:' + (process.env.PORT || 3000);
     const params = new URLSearchParams({ olat, olng, dlat, dlng, r: r || '200' });
     const url = baseUrl + '/?' + params.toString();
 
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.waitForSelector('#shareRow', { state: 'visible', timeout: 30000 });
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 40000 });
+    await page.waitForSelector('#shareRow', { state: 'visible', timeout: 40000 });
     await page.waitForTimeout(2000);
 
     // Hide sidebar so map fills viewport, thicken route lines, clean up UI
@@ -61,7 +82,6 @@ module.exports = async function handler(req, res) {
       if (mapEl) { mapEl.style.width = '100vw'; mapEl.style.height = '100vh'; }
       if (window.App && App.map) {
         App.map.invalidateSize();
-        // Zoom in one level for street-name detail
         App.map.zoomIn(1);
       }
       document.querySelectorAll('.leaflet-overlay-pane path').forEach(p => {
@@ -93,8 +113,6 @@ module.exports = async function handler(req, res) {
 
     const rd = routeData || { distance: '?', duration: '?', coverage: '?' };
 
-    // A4 landscape: 297×210mm, minus 10mm margins = 277×190mm usable
-    // Header ~8mm, footer ~6mm → map gets ~176mm max height
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=Noto+Sans+Hebrew:wght@400;600&display=swap" rel="stylesheet">
