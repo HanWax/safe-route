@@ -175,8 +175,9 @@ App._buildShelterChain = function(orig, dest, shelters, maxEdge) {
   var chain = [];
   var used = new Set();
   var current = orig;
-  var totalDist = orig.distanceTo(dest);
-  var maxSteps = Math.min(20, Math.ceil(totalDist / (maxEdge * 0.5)));
+  var straightLineDist = orig.distanceTo(dest);
+  var maxSteps = Math.min(20, Math.ceil(straightLineDist / (maxEdge * 0.5)));
+  var chainDist = 0;
   for (var step = 0; step < maxSteps; step++) {
     var distToTarget = current.distanceTo(dest);
     if (distToTarget <= maxEdge) break;
@@ -189,17 +190,20 @@ App._buildShelterChain = function(orig, dest, shelters, maxEdge) {
       if (dFromCurr > maxEdge || dFromCurr < 30) continue;
       var dToTarget = s.location.distanceTo(dest);
       var progress = distToTarget - dToTarget;
-      if (progress < maxEdge * 0.1) continue;
+      if (progress < maxEdge * 0.25) continue;
       var detour = dFromCurr + dToTarget - distToTarget;
-      var score = progress - detour * 0.5;
+      var score = progress - detour * 1.5;
       if (score > bestScore) {
         bestScore = score;
         bestShelter = s;
       }
     }
     if (!bestShelter) break;
+    var hopDist = current.distanceTo(bestShelter.location);
+    if (chainDist + hopDist + bestShelter.location.distanceTo(dest) > straightLineDist * 1.4) break;
     chain.push(bestShelter);
     used.add(bestShelter.id);
+    chainDist += hopDist;
     current = bestShelter.location;
   }
   return chain;

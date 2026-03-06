@@ -148,8 +148,9 @@ App._buildShelterChain = function(orig, dest, shelters, maxEdge) {
   var chain = [];
   var used = new Set();
   var current = orig;
-  var totalDist = orig.distanceTo(dest);
-  var maxSteps = Math.min(20, Math.ceil(totalDist / (maxEdge * 0.5)));
+  var straightLineDist = orig.distanceTo(dest);
+  var maxSteps = Math.min(20, Math.ceil(straightLineDist / (maxEdge * 0.5)));
+  var chainDist = 0; // total walking distance accumulated
 
   for (var step = 0; step < maxSteps; step++) {
     var distToTarget = current.distanceTo(dest);
@@ -163,14 +164,16 @@ App._buildShelterChain = function(orig, dest, shelters, maxEdge) {
       if (used.has(s.id)) continue;
 
       var dFromCurr = current.distanceTo(s.location);
-      if (dFromCurr > maxEdge || dFromCurr < 30) continue; // too far or too close
+      if (dFromCurr > maxEdge || dFromCurr < 30) continue;
 
       var dToTarget = s.location.distanceTo(dest);
       var progress = distToTarget - dToTarget;
-      if (progress < maxEdge * 0.1) continue; // must make meaningful forward progress
+      // Must make at least 25% of maxEdge in forward progress (prevents lateral drift)
+      if (progress < maxEdge * 0.25) continue;
 
       var detour = dFromCurr + dToTarget - distToTarget;
-      var score = progress - detour * 0.5;
+      // Penalise detour more heavily to keep route tight
+      var score = progress - detour * 1.5;
 
       if (score > bestScore) {
         bestScore = score;
@@ -179,8 +182,14 @@ App._buildShelterChain = function(orig, dest, shelters, maxEdge) {
     }
 
     if (!bestShelter) break;
+
+    // Guard: don't let total chain distance exceed 1.4x the straight-line distance
+    var hopDist = current.distanceTo(bestShelter.location);
+    if (chainDist + hopDist + bestShelter.location.distanceTo(dest) > straightLineDist * 1.4) break;
+
     chain.push(bestShelter);
     used.add(bestShelter.id);
+    chainDist += hopDist;
     current = bestShelter.location;
   }
 
@@ -250,14 +259,21 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   var corridorRoutes = await App._buildCorridorCandidates(orig, dest, shelters, radius, directRoute);
   baseRouteCandidates = baseRouteCandidates.concat(corridorRoutes);
 
-  // Evaluate all candidates and pick the one with best coverage
+  // Evaluate all candidates and pick the one with best coverage-per-distance
   var baseRoute = directRoute;
-  var bestBasePct = 0;
+  var bestBaseScore = -Infinity;
+  var directCov = App.analyseRouteCoverage(directRoute.path, shelters, radius);
   for (var bi = 0; bi < baseRouteCandidates.length; bi++) {
-    var cov = App.analyseRouteCoverage(baseRouteCandidates[bi].path, shelters, radius);
-    if (cov.coveredPct > bestBasePct) {
-      bestBasePct = cov.coveredPct;
-      baseRoute = baseRouteCandidates[bi];
+    var candidate = baseRouteCandidates[bi];
+    var cov = App.analyseRouteCoverage(candidate.path, shelters, radius);
+    // Score: coverage percentage, penalised by distance increase over direct route.
+    // A route 1.3x longer needs substantially better coverage to win.
+    var distRatio = candidate.totalDistance / directDist;
+    var distPenalty = Math.max(0, (distRatio - 1)) * 40; // 40% coverage penalty per 1x distance increase
+    var score = cov.coveredPct - distPenalty;
+    if (score > bestBaseScore) {
+      bestBaseScore = score;
+      baseRoute = candidate;
     }
   }
 
