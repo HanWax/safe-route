@@ -445,10 +445,10 @@ App.detectCities = function(routePath) {
   var matches = [];
   for (var j = 0; j < App.CITY_CONFIGS.length; j++) {
     var cfg = App.CITY_CONFIGS[j];
-    var cityLoc = new google.maps.LatLng(cfg.center.lat, cfg.center.lng);
+    var cityLoc = L.latLng(cfg.center.lat, cfg.center.lng);
     var minDist = Infinity;
     for (var i = 0; i < routePath.length; i++) {
-      var d = google.maps.geometry.spherical.computeDistanceBetween(cityLoc, routePath[i]);
+      var d = cityLoc.distanceTo(routePath[i]);
       if (d < minDist) minDist = d;
     }
     if (minDist <= MAX_DIST_KM * 1000) {
@@ -459,7 +459,7 @@ App.detectCities = function(routePath) {
   if (!matches.length) {
     // Fallback: pick the single nearest city
     var mid = routePath[Math.floor(routePath.length / 2)];
-    var midLat = mid.lat(), midLng = mid.lng();
+    var midLat = mid.lat, midLng = mid.lng;
     var best = null, bestDist = Infinity;
     for (var k = 0; k < App.CITY_CONFIGS.length; k++) {
       var c = App.CITY_CONFIGS[k];

@@ -172,12 +172,7 @@ App.run = async function() {
   App.setBusy(true);
   try {
     if (!App.mapsReady) {
-      App.setStatus(App.t('statusLoadingConfig'), 'info');
-      var res = await fetch('/api/config');
-      if (!res.ok) throw new Error(App.t('statusConfigErr'));
-      var configData = await res.json();
       App.setStatus(App.t('statusLoadingMaps'), 'info');
-      await App.loadMaps(configData.key);
       App.initMap();
     }
 
@@ -193,8 +188,8 @@ App.run = async function() {
       destCoords = await App.geocode(destText);
       if (!destCoords) { App.setStatus(App.t('statusGeocodeFailed'), 'err'); App.setBusy(false); return; }
     }
-    var orig = new google.maps.LatLng(origCoords.lat, origCoords.lng);
-    var dest = new google.maps.LatLng(destCoords.lat, destCoords.lng);
+    var orig = L.latLng(origCoords.lat, origCoords.lng);
+    var dest = L.latLng(destCoords.lat, destCoords.lng);
 
     App.clearAll();
     App.setStatus(App.t('statusGettingRoute'), 'info');
@@ -202,6 +197,15 @@ App.run = async function() {
     var directRoute = await App.getRoute(orig, dest, null, { alternates: 5 });
     if (!directRoute) return;
     if (runId !== App._runId) return;
+
+    // If the primary Valhalla route overshoots, try without alternatives
+    if (App._routeOvershoots(directRoute.path, orig, dest)) {
+      console.warn('Primary route overshoots, retrying without alternatives');
+      var simpleRoute = await App.getRoute(orig, dest);
+      if (simpleRoute && !App._routeOvershoots(simpleRoute.path, orig, dest)) {
+        directRoute = simpleRoute;
+      }
+    }
 
     var bbox = App.getPathBbox(directRoute.path, 0.012);
     var cities = App.detectCities(directRoute.path);
@@ -219,6 +223,13 @@ App.run = async function() {
     );
     var finalRoute = buildResult.waypointRoute || directRoute;
 
+    // Reject any route that overshoots beyond origin or destination
+    if (App._routeOvershoots(finalRoute.path, orig, dest)) {
+      console.warn('Route overshoots O-D endpoints, falling back to direct route');
+      finalRoute = directRoute;
+      buildResult = { waypointRoute: null, usedShelters: [], achievedPct: 0 };
+    }
+
     var analysis = App.analyseRouteCoverage(finalRoute.path, shelters, radius);
 
     App.drawRoute(analysis.coveredPolyline, analysis.gapPolylines, analysis.gaps);
@@ -226,7 +237,6 @@ App.run = async function() {
     App.drawShelterMarkers(shelters, buildResult.usedShelters);
     App.drawEndpoints(finalRoute);
     App.fitAll(finalRoute, shelters);
-
     App.setupDraggableRoute(orig, dest, finalRoute, shelters, radius);
 
     App.lastRouteShare = {
@@ -234,6 +244,7 @@ App.run = async function() {
       endLocation: finalRoute.endLocation,
       waypoints: buildResult.usedShelters,
       coveragePct: analysis.coveredPct,
+      radius: radius,
     };
 
     App.renderScore(analysis.coveredPct, analysis.gaps, finalRoute, shelters.length);
@@ -244,7 +255,6 @@ App.run = async function() {
 
     document.getElementById('legend').classList.add('show');
     document.getElementById('emptyState').style.display = 'none';
-    document.getElementById('dragHint').classList.add('show');
     App.showFirstRunTip();
 
     var pctLabel = analysis.coveredPct >= 99
@@ -332,8 +342,8 @@ App.buildGoogleMapsUrl = function() {
   var share = App.lastRouteShare;
   if (!share) return null;
 
-  var origin = share.startLocation.lat() + ',' + share.startLocation.lng();
-  var dest = share.endLocation.lat() + ',' + share.endLocation.lng();
+  var origin = share.startLocation.lat + ',' + share.startLocation.lng;
+  var dest = share.endLocation.lat + ',' + share.endLocation.lng;
 
   var url = 'https://www.google.com/maps/dir/?api=1'
     + '&origin=' + origin
@@ -356,8 +366,21 @@ App.shareToGoogleMaps = function() {
   window.open(url, '_blank', 'noopener');
 };
 
+App.buildShareUrl = function() {
+  var share = App.lastRouteShare;
+  if (!share) return null;
+  var params = new URLSearchParams({
+    olat: share.startLocation.lat.toFixed(6),
+    olng: share.startLocation.lng.toFixed(6),
+    dlat: share.endLocation.lat.toFixed(6),
+    dlng: share.endLocation.lng.toFixed(6),
+    r: share.radius,
+  });
+  return window.location.origin + window.location.pathname + '?' + params.toString();
+};
+
 App.shareRoute = function(e) {
-  var url = App.buildGoogleMapsUrl();
+  var url = App.buildShareUrl();
   if (!url) return;
 
   var share = App.lastRouteShare;
@@ -409,7 +432,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Shelter radius toggle sync
   function toggleShelterCircles(visible) {
-    App.shelterCircles.forEach(function(c) { c.setMap(visible ? App.map : null); });
+    App.shelterCircles.forEach(function(c) {
+      if (visible) { if (!App.map.hasLayer(c)) c.addTo(App.map); }
+      else { c.remove(); }
+    });
   }
   var srToggle = document.getElementById('showRadius');
   var mSrToggle = document.getElementById('mobileShowRadius');
@@ -464,15 +490,43 @@ window.addEventListener('resize', function() {
 // Init language from saved preference
 App.setLang(localStorage.getItem('miklat-lang') || 'en');
 
-// Load map eagerly so user sees Israel immediately
-(async function preloadMap() {
-  try {
-    var res = await fetch('/api/config');
-    if (!res.ok) return;
-    var data = await res.json();
-    await App.loadMaps(data.key);
-    App.initMap();
-  } catch (e) {
-    // Map will load on first route request instead
+// Auto-run from shared URL params
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var olat = parseFloat(params.get('olat'));
+  var olng = parseFloat(params.get('olng'));
+  var dlat = parseFloat(params.get('dlat'));
+  var dlng = parseFloat(params.get('dlng'));
+  if (isNaN(olat) || isNaN(olng) || isNaN(dlat) || isNaN(dlng)) return;
+
+  var r = parseInt(params.get('r'));
+  if (!isNaN(r)) {
+    document.getElementById('radius').value = r;
+    var mr = document.getElementById('mobileRadius');
+    if (mr) mr.value = r;
   }
+
+  // Reverse-geocode to fill in address fields, then run
+  App.geoLocations.origin = { lat: olat, lng: olng };
+  App.geoLocations.dest = { lat: dlat, lng: dlng };
+
+  Promise.all([
+    App.nominatimReverse(olat, olng),
+    App.nominatimReverse(dlat, dlng),
+  ]).then(function(names) {
+    var origName = names[0] || (olat.toFixed(5) + ', ' + olng.toFixed(5));
+    var destName = names[1] || (dlat.toFixed(5) + ', ' + dlng.toFixed(5));
+    document.getElementById('origin').value = origName;
+    document.getElementById('dest').value = destName;
+    var mo = document.getElementById('mobileOrigin');
+    var md = document.getElementById('mobileDest');
+    if (mo) mo.value = origName;
+    if (md) md.value = destName;
+    // Clean the URL so it doesn't re-trigger on refresh after user changes inputs
+    history.replaceState(null, '', window.location.pathname);
+    App.run();
+  });
 })();
+
+// Load map eagerly so user sees Israel immediately
+App.initMap();
