@@ -139,74 +139,107 @@ App.fetchShelters = async function(bbox, routePath) {
   return shelters;
 };
 
-// Divide the area between origin and destination into a grid and score each
-// cell by shelter density.  Return shelter-dense cells sorted by density.
-App._shelterDensityGrid = function(orig, dest, shelters, radius, cols, rows) {
-  var minLat = Math.min(orig.lat, dest.lat) - 0.005;
-  var maxLat = Math.max(orig.lat, dest.lat) + 0.005;
-  var minLng = Math.min(orig.lng, dest.lng) - 0.005;
-  var maxLng = Math.max(orig.lng, dest.lng) + 0.005;
-  var cellH = (maxLat - minLat) / rows;
-  var cellW = (maxLng - minLng) / cols;
-
-  var grid = [];
-  for (var r = 0; r < rows; r++) {
-    for (var c = 0; c < cols; c++) {
-      grid.push({
-        lat: minLat + (r + 0.5) * cellH,
-        lng: minLng + (c + 0.5) * cellW,
-        count: 0,
-      });
-    }
-  }
-
+// Build candidate corridor routes through shelter-dense areas.
+// Strategy: find clusters of shelters that are offset from the direct route,
+// then build multi-waypoint routes through chains of those shelters.
+App._buildCorridorCandidates = async function(orig, dest, shelters, radius, directRoute) {
+  var MAX_DETOUR_RATIO = 1.5;
+  var directDist = directRoute.totalDistance;
   var effectiveRadius = radius / App.WALK_FACTOR;
-  shelters.forEach(function(s) {
-    for (var i = 0; i < grid.length; i++) {
-      if (s.location.distanceTo(L.latLng(grid[i].lat, grid[i].lng)) <= effectiveRadius) {
-        grid[i].count++;
-      }
-    }
+
+  // 1. Find shelters that are far from the direct route path (potential alternate corridors)
+  var offPathShelters = shelters.map(function(s) {
+    return { shelter: s, pathDist: App.minDistToPath(s.location, directRoute.path) };
+  }).filter(function(x) {
+    // Shelters between 150m and 800m from the direct path (not already on it, but not wildly off)
+    return x.pathDist > 150 && x.pathDist < 800;
   });
 
-  return grid.filter(function(g) { return g.count > 0; })
-    .sort(function(a, b) { return b.count - a.count; });
-};
-
-// Build candidate corridor routes by routing through shelter-dense zones.
-// Returns an array of { route, shelters } objects.
-App._buildCorridorCandidates = async function(orig, dest, shelters, radius, directDist) {
-  var MAX_DETOUR_RATIO = 1.5;
-  var denseZones = App._shelterDensityGrid(orig, dest, shelters, radius, 5, 5);
-
-  // Pick up to 3 distinct dense zones as corridor pivots
-  var pivots = [];
-  var minPivotSpacing = orig.distanceTo(dest) * 0.15; // pivots must be spaced apart
-  for (var i = 0; i < denseZones.length && pivots.length < 3; i++) {
-    var zone = denseZones[i];
-    var zoneLL = L.latLng(zone.lat, zone.lng);
-    // Skip zones too close to origin or destination
-    if (zoneLL.distanceTo(orig) < minPivotSpacing || zoneLL.distanceTo(dest) < minPivotSpacing) continue;
-    // Skip zones too close to already-selected pivots
-    var tooClose = false;
-    for (var j = 0; j < pivots.length; j++) {
-      if (zoneLL.distanceTo(pivots[j]) < minPivotSpacing) { tooClose = true; break; }
-    }
-    if (!tooClose) pivots.push(zoneLL);
+  if (!offPathShelters.length) {
+    console.log('[corridor] No off-path shelters found (150-800m from direct route)');
+    return [];
   }
 
+  // 2. Cluster off-path shelters by proximity to each other
+  // Use a simple greedy clustering: pick a seed, grab all within 400m, repeat
+  var unclustered = offPathShelters.slice();
+  var clusters = [];
+  while (unclustered.length > 0) {
+    var seed = unclustered.shift();
+    var cluster = [seed];
+    var remaining = [];
+    for (var i = 0; i < unclustered.length; i++) {
+      var inRange = false;
+      for (var j = 0; j < cluster.length; j++) {
+        if (unclustered[i].shelter.location.distanceTo(cluster[j].shelter.location) <= 400) {
+          inRange = true;
+          break;
+        }
+      }
+      if (inRange) cluster.push(unclustered[i]);
+      else remaining.push(unclustered[i]);
+    }
+    unclustered = remaining;
+    if (cluster.length >= 3) clusters.push(cluster); // only meaningful clusters
+  }
+
+  console.log('[corridor] Found ' + clusters.length + ' off-path shelter clusters (3+ shelters each)');
+
+  // 3. For each cluster, build a corridor route using shelters as waypoints
+  //    Pick shelters spread along the origin→destination axis
   var candidates = [];
-  for (var pi = 0; pi < pivots.length; pi++) {
+  var maxClusters = Math.min(clusters.length, 3);
+
+  // Sort clusters by size (largest first)
+  clusters.sort(function(a, b) { return b.length - a.length; });
+
+  for (var ci = 0; ci < maxClusters; ci++) {
+    var cluster = clusters[ci];
+
+    // Order cluster shelters by their projection onto the origin→destination line
+    var clusterSorted = cluster.slice().sort(function(a, b) {
+      var projA = App._projectOntoLine(a.shelter.location, orig, dest);
+      var projB = App._projectOntoLine(b.shelter.location, orig, dest);
+      return projA - projB;
+    });
+
+    // Pick evenly spaced waypoints along the cluster (max 5)
+    var maxWP = Math.min(5, clusterSorted.length);
+    var waypoints = [];
+    for (var wi = 0; wi < maxWP; wi++) {
+      var idx = Math.floor(wi * (clusterSorted.length - 1) / Math.max(maxWP - 1, 1));
+      waypoints.push(L.latLng(clusterSorted[idx].shelter.lat, clusterSorted[idx].shelter.lon));
+    }
+
+    console.log('[corridor] Cluster ' + ci + ': ' + cluster.length + ' shelters, using ' +
+      waypoints.length + ' waypoints');
+
     try {
-      var route = await App.getRoute(orig, dest, [pivots[pi]]);
-      if (route && route.totalDistance <= directDist * MAX_DETOUR_RATIO) {
-        candidates.push(route);
+      var route = await App.getRoute(orig, dest, waypoints);
+      if (route) {
+        console.log('[corridor] Cluster ' + ci + ' route: ' + route.totalDistance + 'm (direct: ' + directDist + 'm, ratio: ' + (route.totalDistance / directDist).toFixed(2) + ')');
+        if (route.totalDistance <= directDist * MAX_DETOUR_RATIO) {
+          candidates.push(route);
+        } else {
+          console.log('[corridor] Cluster ' + ci + ' rejected: too long');
+        }
       }
     } catch (e) {
-      console.warn('Corridor candidate ' + pi + ' failed', e);
+      console.warn('[corridor] Cluster ' + ci + ' routing failed', e);
     }
   }
+
   return candidates;
+};
+
+// Project a point onto the line from A to B, returning a 0-1 scalar
+App._projectOntoLine = function(point, lineA, lineB) {
+  var dx = lineB.lng - lineA.lng;
+  var dy = lineB.lat - lineA.lat;
+  var len2 = dx * dx + dy * dy;
+  if (len2 === 0) return 0;
+  var t = ((point.lng - lineA.lng) * dx + (point.lat - lineA.lat) * dy) / len2;
+  return Math.max(0, Math.min(1, t));
 };
 
 App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius) {
@@ -228,14 +261,17 @@ App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius
   App.setStatus(App.t('statusOptimising') || 'Optimising route…', 'info');
 
   // Generate corridor candidates through shelter-dense areas
-  var corridorRoutes = await App._buildCorridorCandidates(orig, dest, shelters, radius, directDist);
+  var corridorRoutes = await App._buildCorridorCandidates(orig, dest, shelters, radius, directRoute);
   baseRouteCandidates = baseRouteCandidates.concat(corridorRoutes);
 
   // Evaluate all candidates and pick the one with best coverage
+  console.log('[shelter-route] Evaluating ' + baseRouteCandidates.length + ' base route candidates (' +
+    (baseRouteCandidates.length - corridorRoutes.length) + ' OSRM + ' + corridorRoutes.length + ' corridor)');
   var baseRoute = directRoute;
   var bestBasePct = 0;
   for (var bi = 0; bi < baseRouteCandidates.length; bi++) {
     var cov = App.analyseRouteCoverage(baseRouteCandidates[bi].path, shelters, radius);
+    console.log('[shelter-route] Candidate ' + bi + ': coverage=' + cov.coveredPct + '%, dist=' + baseRouteCandidates[bi].totalDistance + 'm');
     if (cov.coveredPct > bestBasePct) {
       bestBasePct = cov.coveredPct;
       baseRoute = baseRouteCandidates[bi];
