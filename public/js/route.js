@@ -120,11 +120,115 @@ App.fetchShelters = async function(bbox, routePath) {
   return shelters;
 };
 
+App._decodeValhalla = function(encoded) {
+  // Valhalla uses precision 6 (Google uses 5)
+  var inv = 1e-6;
+  var decoded = [];
+  var lat = 0, lng = 0;
+  var i = 0;
+  while (i < encoded.length) {
+    var b, shift = 0, result = 0;
+    do { b = encoded.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    shift = 0; result = 0;
+    do { b = encoded.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    decoded.push(new google.maps.LatLng(lat * inv, lng * inv));
+  }
+  return decoded;
+};
+
+App._getValhallaAlternatives = async function(orig, dest) {
+  var body = JSON.stringify({
+    locations: [
+      { lat: orig.lat(), lon: orig.lng() },
+      { lat: dest.lat(), lon: dest.lng() },
+    ],
+    costing: 'pedestrian',
+    alternates: 2,
+  });
+  try {
+    var resp = await fetch('https://valhalla1.openstreetmap.de/route', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body,
+    });
+    var data = await resp.json();
+    var routes = [];
+    if (data.trip) routes.push(data.trip);
+    if (data.alternates) {
+      data.alternates.forEach(function(alt) { if (alt.trip) routes.push(alt.trip); });
+    }
+    return routes.map(function(trip) {
+      var shape = trip.legs[0].shape;
+      return App._decodeValhalla(shape);
+    });
+  } catch (e) {
+    console.warn('Valhalla alternatives fetch failed', e);
+    return [];
+  }
+};
+
+App._pickBestCorridor = function(directPath, altPaths, shelters, radius) {
+  var bestPath = directPath;
+  var bestCoverage = App.analyseRouteCoverage(directPath, shelters, radius);
+
+  altPaths.forEach(function(altPath) {
+    var coverage = App.analyseRouteCoverage(altPath, shelters, radius);
+    if (coverage.coveredPct > bestCoverage.coveredPct ||
+        (coverage.coveredPct === bestCoverage.coveredPct && (coverage.gapDist || 0) < (bestCoverage.gapDist || 0))) {
+      bestPath = altPath;
+      bestCoverage = coverage;
+    }
+  });
+
+  return { path: bestPath, coverage: bestCoverage };
+};
+
+App._extractCorridorWaypoints = function(corridorPath, numWaypoints) {
+  // Sample evenly-spaced points along the corridor to use as Google waypoints
+  if (corridorPath.length < 3) return [];
+  var step = Math.floor(corridorPath.length / (numWaypoints + 1));
+  var waypoints = [];
+  for (var i = 1; i <= numWaypoints; i++) {
+    var idx = Math.min(i * step, corridorPath.length - 1);
+    waypoints.push(corridorPath[idx]);
+  }
+  return waypoints;
+};
+
 App.buildShelterRoute = async function(orig, dest, directRoute, shelters, radius) {
   var coverageTarget = 100;
   if (!shelters.length) return { waypointRoute: null, usedShelters: [], achievedPct: 0 };
 
   var directCoverage = App.analyseRouteCoverage(directRoute.path, shelters, radius);
+
+  // Explore alternative corridors via Valhalla
+  var altPaths = await App._getValhallaAlternatives(
+    directRoute.startLocation, directRoute.endLocation
+  );
+  var corridor = App._pickBestCorridor(directRoute.path, altPaths, shelters, radius);
+
+  // If a Valhalla alternative is better, re-route Google through that corridor
+  if (corridor.path !== directRoute.path && corridor.coverage.coveredPct > directCoverage.coveredPct) {
+    var corridorWps = App._extractCorridorWaypoints(corridor.path, 5);
+    try {
+      var corridorRoute = await App.getRoute(orig, dest, corridorWps);
+      if (corridorRoute) {
+        var corridorCov = App.analyseRouteCoverage(corridorRoute.path, shelters, radius);
+        if (corridorCov.coveredPct >= coverageTarget) {
+          return { waypointRoute: corridorRoute, usedShelters: [], achievedPct: corridorCov.coveredPct };
+        }
+        // Use the better corridor as the new base for gap-patching
+        if (corridorCov.coveredPct > directCoverage.coveredPct) {
+          directRoute = corridorRoute;
+          directCoverage = corridorCov;
+        }
+      }
+    } catch (e) {
+      console.warn('Corridor re-route failed, using direct route', e);
+    }
+  }
   if (directCoverage.coveredPct >= coverageTarget) {
     return { waypointRoute: directRoute, usedShelters: [], achievedPct: directCoverage.coveredPct };
   }
