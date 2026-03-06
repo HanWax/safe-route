@@ -2,7 +2,7 @@
   "functions": {
     "api/pdf.js": {
       "memory": 1024,
-      "maxDuration": 30
+      "maxDuration": 45
     }
   },
   "rewrites": [

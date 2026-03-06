@@ -30,6 +30,10 @@ module.exports = async function handler(req, res) {
   if (!olat || !olng || !dlat || !dlng) {
     return res.status(400).json({ error: 'Missing route coordinates' });
   }
+  const coords = [parseFloat(olat), parseFloat(olng), parseFloat(dlat), parseFloat(dlng)];
+  if (coords.some(isNaN) || Math.abs(coords[0]) > 90 || Math.abs(coords[2]) > 90 || Math.abs(coords[1]) > 180 || Math.abs(coords[3]) > 180) {
+    return res.status(400).json({ error: 'Invalid coordinates' });
+  }
 
   let browser;
   try {
@@ -38,10 +42,9 @@ module.exports = async function handler(req, res) {
     // Large viewport for detailed map with readable street names
     await page.setViewportSize({ width: 1400, height: 1000 });
 
-    const isLocal = !process.env.VERCEL || process.env.VERCEL_ENV === 'development';
-    const baseUrl = isLocal
-      ? 'http://localhost:' + (process.env.PORT || 3000)
-      : 'https://' + process.env.VERCEL_URL;
+    const baseUrl = process.env.VERCEL_URL
+      ? 'https://' + process.env.VERCEL_URL
+      : 'http://localhost:' + (process.env.PORT || 3000);
     const params = new URLSearchParams({ olat, olng, dlat, dlng, r: r || '200' });
     const url = baseUrl + '/?' + params.toString();
 
