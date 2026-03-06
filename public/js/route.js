@@ -11,6 +11,28 @@ App.nominatimGeocode = function(query) {
   });
 };
 
+App.geocode = function(query) {
+  // Use Google Geocoder (already loaded for map) with Nominatim fallback
+  if (typeof google !== 'undefined' && google.maps && google.maps.Geocoder) {
+    if (!App._geocoder) App._geocoder = new google.maps.Geocoder();
+    return new Promise(function(resolve) {
+      App._geocoder.geocode(
+        { address: query, region: 'il' },
+        function(results, status) {
+          if (status === 'OK' && results.length) {
+            var loc = results[0].geometry.location;
+            resolve({ lat: loc.lat(), lng: loc.lng() });
+          } else {
+            // Fall back to Nominatim
+            App.nominatimGeocode(query).then(resolve);
+          }
+        }
+      );
+    });
+  }
+  return App.nominatimGeocode(query);
+};
+
 App.nominatimReverse = function(lat, lng) {
   return fetch('https://nominatim.openstreetmap.org/reverse?' + new URLSearchParams({
     lat: lat, lon: lng, format: 'json',

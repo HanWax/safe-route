@@ -184,13 +184,13 @@ App.run = async function() {
     var origCoords = App.geoLocations.origin;
     if (!origCoords) {
       App.setStatus(App.t('statusGeocoding'), 'info');
-      origCoords = await App.nominatimGeocode(origText);
+      origCoords = await App.geocode(origText);
       if (!origCoords) { App.setStatus(App.t('statusGeocodeFailed'), 'err'); App.setBusy(false); return; }
     }
     var destCoords = App.geoLocations.dest;
     if (!destCoords) {
       App.setStatus(App.t('statusGeocoding'), 'info');
-      destCoords = await App.nominatimGeocode(destText);
+      destCoords = await App.geocode(destText);
       if (!destCoords) { App.setStatus(App.t('statusGeocodeFailed'), 'err'); App.setBusy(false); return; }
     }
     var orig = new google.maps.LatLng(origCoords.lat, origCoords.lng);
