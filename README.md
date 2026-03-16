@@ -1,24 +1,39 @@
 # Miklat | מקלט
 
-A walking route planner for Tel Aviv-Yafo that keeps you within reach of a public bomb shelter at all times.
+A walking route planner for Israel that keeps you within reach of a public bomb shelter at all times.
 
 ---
 
 ## Architecture
 
-Zero-build single-page app. No framework, no bundler, no database.
+Zero-build single-page app. No framework, no bundler. Neon PostgreSQL for reviews and community shelters.
 
 ```
 miklat-vercel/
 ├── api/
-│   └── config.js       Serverless function — returns Google Maps API key from env
+│   ├── _db.js              Neon DB connection
+│   ├── review.js            Shelter reviews (POST)
+│   ├── reviews.js           Shelter reviews (GET)
+│   ├── community-shelter.js Community shelters (POST)
+│   ├── community-shelters.js Community shelters (GET)
+│   └── pdf.js               Server-side PDF export
 ├── public/
-│   └── index.html      Entire app: HTML + CSS + vanilla JS (~1,100 lines)
-├── vercel.json         Rewrites: /api/* → serverless, everything else → index.html
+│   ├── index.html           Main HTML
+│   ├── css/styles.css       Stylesheet
+│   └── js/
+│       ├── app.js           Main app logic
+│       ├── map.js           Leaflet map, Photon autocomplete, markers
+│       ├── route.js         Shelter fetch, Valhalla routing, coverage analysis
+│       ├── config.js        City configs with ArcGIS endpoints
+│       ├── ui.js            UI rendering (score, shelter list, gaps, reviews)
+│       ├── community.js     Community miklat add/fetch
+│       ├── i18n.js          EN/HE translations
+│       └── mobile.js        Mobile bottom sheet
+├── vercel.json              Rewrites + function config
 └── .gitignore
 ```
 
-Hosted on **Vercel**. The serverless function exists solely to keep the Google API key out of the frontend source — the browser fetches it from `/api/config` at runtime (cached 1 hour via `s-maxage=3600`).
+Hosted on **Vercel**. Fully open-source map stack — no API keys required for map, routing, or geocoding.
 
 ---
 
@@ -26,13 +41,12 @@ Hosted on **Vercel**. The serverless function exists solely to keep the Google A
 
 | Source | What it provides | Auth |
 |--------|-----------------|------|
-| **Tel Aviv-Yafo Municipality GIS** — [ArcGIS REST, layer 592](https://gisn.tel-aviv.gov.il/arcgis/rest/services/WM/IView2WM/MapServer/592) | Shelter locations with type, status, accessibility, filtration, area, entrance notes | None — open public data |
-| **Google Maps JavaScript API** | Map rendering, geocoding, autocomplete, geometry calculations | API key |
-| **Google Directions API** | Walking route polylines and waypoint routing | Same key |
-| **Google Distance Matrix API** | Actual walking distances and times from route to shelters | Same key |
-| **Google Places API** | Address autocomplete on the input fields | Same key |
-
-Shelter metadata returned from the municipal GIS includes: shelter type (`t_sug`), street address in Hebrew and English, operational status (`pail`), wheelchair accessibility (`miklat_mungash`), filtration system type (`t_sinon`), area in m² (`shetach_mr`), opening hours, entrance directions in Hebrew (`hearot`), and open/closed status.
+| **Municipal GIS** — ArcGIS REST endpoints per city | Shelter locations with type, status, accessibility, filtration, area, entrance notes | None — open public data |
+| **Leaflet** + CartoDB Positron tiles | Map rendering | None |
+| **Valhalla** (OpenStreetMap) | Walking routes and distance matrix | None |
+| **Nominatim** (OpenStreetMap) | Geocoding | None |
+| **Photon** (Komoot) | Address autocomplete | None |
+| **Neon PostgreSQL** | Shelter reviews and community shelters | Connection string |
 
 ---
 
@@ -42,7 +56,7 @@ A four-stage pipeline runs on every request. All processing happens client-side 
 
 ### 1. Direct route
 
-Google Directions API returns a standard walking route between the two addresses. The encoded polyline is decoded into a sequence of lat/lng points.
+Valhalla pedestrian routing returns a walking route between the two addresses. The encoded polyline is decoded into a sequence of lat/lng points.
 
 ### 2. Shelter fetch
 
@@ -50,9 +64,9 @@ A bounding box is computed around the direct route with a ~1.2 km buffer. A spat
 
 ### 3. Shelter-aware re-routing
 
-Every point on the direct polyline is checked for coverage — whether any shelter lies within walking distance of the user's chosen radius (200 m, 400 m, or 600 m), using a 1.3× correction factor to convert straight-line to walking distance. Uncovered points are collected as gaps. For each gap point, the nearest shelter is found by geodesic distance. Unique nearest shelters become candidate waypoints, excluding any further than 4x the effective radius. The list is capped at 23 (Google's limit is 25 total; 2 are reserved for origin/destination).
+Every point on the direct polyline is checked for coverage — whether any shelter lies within walking distance of the user's chosen radius (200 m, 400 m, or 600 m), using a 1.3× correction factor to convert straight-line to walking distance. Uncovered points are collected as gaps. For each gap point, the nearest shelter is found by geodesic distance. Unique nearest shelters become candidate waypoints, excluding any further than 4x the effective radius.
 
-The Directions API is called again with these shelters injected as `stopover: false` waypoints, bending the route toward shelter coverage without creating mandatory stops. If the waypoint request fails, the app falls back to the direct route.
+Valhalla is called again with these shelters injected as intermediate locations, bending the route toward shelter coverage without creating mandatory stops. If the waypoint request fails, the app falls back to the direct route.
 
 ### 4. Coverage analysis
 
@@ -69,7 +83,7 @@ Coverage percentage = covered distance / total distance x 100.
 | Safe segments | Black solid polyline |
 | Gap segments | Red dashed polyline |
 | Shelter coverage | Green translucent circles at chosen radius |
-| Shelter markers | Blue pins (larger if used as a route waypoint) |
+| Shelter markers | Blue circle markers (official) / Orange dashed (community) |
 | Start point | Green dot |
 | End point | Red dot |
 
@@ -91,12 +105,11 @@ The sidebar displays: coverage score (0-100%), total distance and walk time, she
 
 1. Push to GitHub
 2. Import at [vercel.com/new](https://vercel.com/new) — no build settings needed
-3. Add environment variable: `GOOGLE_MAPS_API_KEY`
-4. Enable in Google Cloud Console: Maps JavaScript API, Directions API, Distance Matrix API, Places API
+3. Add environment variable: `DATABASE_URL` (Neon PostgreSQL connection string)
 
 ### Local development
 
-Requires the Vercel CLI — a generic static server won't work because `/api/config` needs the serverless runtime.
+Requires the Vercel CLI for serverless function support.
 
 ```bash
 npm i -g vercel
@@ -105,7 +118,7 @@ npm i -g vercel
 Create `.env.local` in the project root:
 
 ```
-GOOGLE_MAPS_API_KEY=AIza...
+DATABASE_URL=postgres://...
 ```
 
 ```bash
@@ -116,12 +129,8 @@ vercel dev
 
 ## Limitations
 
-- **Tel Aviv-Yafo only.** Shelter data comes exclusively from the Tel Aviv municipality GIS. Any portion of a route outside the city boundary has zero shelter coverage data.
 - **Public shelters only.** Private mamad rooms (ממ״ד) in residential buildings are not in the municipal dataset.
-- **Walking distance is approximate for coverage checks.** Coverage radius applies a 1.3× correction factor to convert straight-line distance to estimated walking distance. Shelter list walking times use the Google Distance Matrix API for actual walking distances where available.
-- **23-waypoint cap.** Google Directions limits requests to 25 waypoints (2 reserved for origin/destination). Very long routes with many gaps may not have all gaps addressed in a single routing call.
+- **Walking distance is approximate for coverage checks.** Coverage radius applies a 1.3× correction factor to convert straight-line distance to estimated walking distance.
 - **Longer routes.** The shelter-aware route can be noticeably longer than the direct route, depending on shelter density in the area.
 - **No real-time status.** The `pail` (operational status) field reflects the municipality's records, not live conditions. Shelters may be temporarily closed for maintenance or locked outside emergencies.
-- **No offline support.** Requires an internet connection and active Google API access.
-- **Desktop-oriented.** The layout assumes a wide viewport with a fixed 340px sidebar. No explicit mobile breakpoints.
 - **Not for emergency use.** This is a planning and awareness tool. Always verify shelter locations with the municipality or [Pikud HaOref](https://www.oref.org.il/).
